@@ -1,6 +1,8 @@
 # NFI 업데이트 스크립트 (PC/Windows PowerShell)
 # 공식 저장소 변경사항 확인 -> main/my-setup 동기화 -> 3개 거래소 브랜치 merge
-# 전략 파일(.py) 변경 시 재시작 필요한 봇 목록만 출력 (자동 재시작 안 함)
+# 전략 파일(.py) 변경 시:
+#   - 컨테이너 실행 중 → 자동 재시작
+#   - 컨테이너 정지 상태 → 건드리지 않음
 
 $ErrorActionPreference = "Stop"
 $ROOT = $PSScriptRoot
@@ -36,11 +38,12 @@ git checkout my-setup 2>&1 | Out-Null
 git merge main --no-edit
 git push origin my-setup
 
-# 4. 각 거래소 브랜치 업데이트
-$restartNeeded = @()
+# 4. 각 거래소 브랜치 업데이트 + 재시작 판단
+$restarted = @()
+$skipped = @()
 
 foreach ($ex in $EXCHANGES) {
-    Write-Host "`n=== [$($ex.Folder)] 업데이트 ===" -ForegroundColor Cyan
+    Write-Host "`n=== [$($ex.Folder)] ===" -ForegroundColor Cyan
     Set-Location "$ROOT\$($ex.Folder)"
 
     git checkout $ex.Branch 2>&1 | Out-Null
@@ -59,29 +62,47 @@ foreach ($ex in $EXCHANGES) {
 
     git push origin $ex.Branch
 
-    # 전략 파일(.py) 변경 여부 확인
+    # 전략 파일(.py) 변경 확인
     $changed = git diff --name-only $before $after
     $pyChanged = $changed | Where-Object { $_ -match "^NostalgiaForInfinity.*\.py$" }
 
-    if ($pyChanged) {
-        Write-Host "  전략 파일 변경됨" -ForegroundColor Yellow
-        $pyChanged | ForEach-Object { Write-Host "    - $_" }
-        $restartNeeded += $ex.Folder
+    if (-not $pyChanged) {
+        Write-Host "  설정/문서만 변경 → 재시작 불필요"
+        continue
+    }
+
+    Write-Host "  전략 파일 변경됨:" -ForegroundColor Yellow
+    $pyChanged | ForEach-Object { Write-Host "    - $_" }
+
+    # 컨테이너 실행 여부 확인
+    $running = docker compose ps --status running -q 2>$null
+
+    if ($running) {
+        Write-Host "  컨테이너 실행 중 → 재시작" -ForegroundColor Yellow
+        docker compose restart
+        $restarted += $ex.Folder
     }
     else {
-        Write-Host "  설정/문서만 변경"
+        Write-Host "  컨테이너 정지 상태 → 재시작 건너뜀"
+        $skipped += $ex.Folder
     }
 }
 
 # 5. 요약
 Write-Host "`n=== 완료 ===" -ForegroundColor Green
 
-if ($restartNeeded.Count -eq 0) {
-    Write-Host "재시작 불필요"
+if ($restarted.Count -gt 0) {
+    Write-Host "재시작됨:" -ForegroundColor Yellow
+    $restarted | ForEach-Object { Write-Host "  - $_" }
 }
-else {
-    Write-Host "`n재시작 필요:" -ForegroundColor Yellow
-    foreach ($f in $restartNeeded) {
-        Write-Host "  cd `"$ROOT\$f`"; docker compose restart"
+
+if ($skipped.Count -gt 0) {
+    Write-Host "`n전략 변경됐지만 정지 상태 (수동 시작 필요):" -ForegroundColor Gray
+    foreach ($f in $skipped) {
+        Write-Host "  cd `"$ROOT\$f`"; docker compose up -d"
     }
+}
+
+if ($restarted.Count -eq 0 -and $skipped.Count -eq 0) {
+    Write-Host "재시작 불필요"
 }
