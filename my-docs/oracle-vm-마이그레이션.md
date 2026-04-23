@@ -108,16 +108,16 @@ cd NostalgiaForInfinity
 cd <NFI_프로젝트_경로>
 
 # .env 전송 (필수)
-scp .env ubuntu@<VM_IP>:/home/ubuntu/projects/NostalgiaForInfinity/
+scp .env ubuntu@<VM_IP>:/home/ubuntu/projects/nostalgia-for-infinity/
 
 # config.json 전송 (필수)
-scp user_data/config.json ubuntu@<VM_IP>:/home/ubuntu/projects/NostalgiaForInfinity/user_data/
+scp user_data/config.json ubuntu@<VM_IP>:/home/ubuntu/projects/nostalgia-for-infinity/user_data/
 
 # 페어리스트 커스텀 설정 전송 (기본값에서 수정한 경우만)
-scp configs/pairlist-volume-binance-usdt.json ubuntu@<VM_IP>:/home/ubuntu/projects/NostalgiaForInfinity/configs/
+scp configs/pairlist-volume-binance-usdt.json ubuntu@<VM_IP>:/home/ubuntu/projects/nostalgia-for-infinity/configs/
 
 # sqlite DB 전송 (이어서 진행 시에만, 새로 시작하면 생략)
-scp user_data/*.sqlite ubuntu@<VM_IP>:/home/ubuntu/projects/NostalgiaForInfinity/user_data/
+scp user_data/*.sqlite ubuntu@<VM_IP>:/home/ubuntu/projects/nostalgia-for-infinity/user_data/
 ```
 
 > Oracle Linux VM이면 사용자명을 `opc`로 변경: `opc@<VM_IP>`
@@ -126,7 +126,7 @@ scp user_data/*.sqlite ubuntu@<VM_IP>:/home/ubuntu/projects/NostalgiaForInfinity
 ### VM에서 도착 확인
 
 ```bash
-cd ~/projects/NostalgiaForInfinity
+cd ~/projects/nostalgia-for-infinity
 ls -la .env user_data/config.json configs/pairlist-volume-binance-usdt.json
 ls -la user_data/*.sqlite  # 이어서 진행 시에만
 ```
@@ -156,7 +156,7 @@ ls -la user_data/
 ## 6단계: 봇 실행
 
 ```bash
-cd ~/projects/NostalgiaForInfinity
+cd ~/projects/nostalgia-for-infinity
 
 # 첫 실행 시 빌드 포함 (ARM64 빌드는 5~10분 소요)
 docker compose up -d --build
@@ -315,9 +315,9 @@ A1.Flex는 OCPU/RAM을 언제든 조절 가능 (재부팅 발생). 단, 늘릴 �
 ```bash
 # sqlite DB와 설정 백업
 tar czf nfi-backup-$(date +%Y%m%d).tar.gz \
-  ~/projects/NostalgiaForInfinity/.env \
-  ~/projects/NostalgiaForInfinity/user_data/config.json \
-  ~/projects/NostalgiaForInfinity/user_data/*.sqlite
+  ~/projects/nostalgia-for-infinity/.env \
+  ~/projects/nostalgia-for-infinity/user_data/config.json \
+  ~/projects/nostalgia-for-infinity/user_data/*.sqlite
 
 # PC로 다운로드
 # (PC에서) scp ubuntu@<VM_IP>:~/nfi-backup-*.tar.gz ./

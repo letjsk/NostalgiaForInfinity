@@ -99,7 +99,7 @@ freqtrade --version
 ## 5단계: 저장소 폴더로 이동
 
 ```bash
-cd /mnt/d/OneDrive/Project/NostalgiaForInfinity
+cd /mnt/d/OneDrive/Project/nostalgia-for-infinity
 ```
 
 저장소 위치가 다르면 경로를 맞게 바꿔서 이동하면 됩니다.
@@ -111,7 +111,7 @@ WSL에서 Windows 드라이브 아래 Git 저장소를 다룰 때 `detected dubi
 그 경우 아래 명령을 실행합니다.
 
 ```bash
-git config --global --add safe.directory /mnt/d/OneDrive/Project/NostalgiaForInfinity
+git config --global --add safe.directory /mnt/d/OneDrive/Project/nostalgia-for-infinity
 ```
 
 ## 7단계: 시장 데이터는 WSL 파일시스템에 저장
@@ -253,7 +253,7 @@ python3 -m venv testenv
 아래 명령으로 저장소를 safe directory로 등록합니다.
 
 ```bash
-git config --global --add safe.directory /mnt/d/OneDrive/Project/NostalgiaForInfinity
+git config --global --add safe.directory /mnt/d/OneDrive/Project/nostalgia-for-infinity
 ```
 
 ## 마지막 정리

@@ -11,7 +11,7 @@
 
 두 위치에 동일한 파일이 있습니다:
 
-- **부모 폴더 (git 외부)**: `NostalgiaForInfinity/update-nfi.ps1` / `.sh` → 바로 실행용
+- **부모 폴더 (git 외부)**: `nostalgia-for-infinity/update-nfi.ps1` / `.sh` → 바로 실행용
 - **git 관리**: 각 클론의 `my-docs/scripts/update-nfi.ps1` / `.sh` → 버전 관리 및 배포용
 
 ## 무엇을 하나
@@ -32,7 +32,7 @@
 ### PC (PowerShell)
 
 ```powershell
-D:\OneDrive\Project\NostalgiaForInfinity\update-nfi.ps1
+D:\OneDrive\Project\nostalgia-for-infinity\update-nfi.ps1
 ```
 
 처음 실행 시 PowerShell 실행 정책 제한 걸릴 수 있음:
@@ -43,13 +43,13 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ### VM (Linux)
 
 ```bash
-bash ~/projects/NostalgiaForInfinity/update-nfi.sh
+bash ~/projects/nostalgia-for-infinity/update-nfi.sh
 ```
 
 또는 실행 권한 주고 직접:
 ```bash
-chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
-~/projects/NostalgiaForInfinity/update-nfi.sh
+chmod +x ~/projects/nostalgia-for-infinity/update-nfi.sh
+~/projects/nostalgia-for-infinity/update-nfi.sh
 ```
 
 ## 출력 해석
@@ -59,11 +59,11 @@ chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
 === 공식 저장소 확인 ===
 공식 저장소 변경 없음
 
-=== [NFI-Binance] ===
+=== [nfi-binance] ===
   변경 없음
-=== [NFI-OKX] ===
+=== [nfi-okx] ===
   변경 없음
-=== [NFI-Bybit] ===
+=== [nfi-bybit] ===
   변경 없음
 
 === 완료 ===
@@ -78,7 +78,7 @@ chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
 === main 동기화 ===
 === my-setup 업데이트 ===
 
-=== [NFI-Binance] ===
+=== [nfi-binance] ===
   my-setup에 6 커밋 앞서있음
   전략 파일 변경됨:
     - NostalgiaForInfinityX7.py
@@ -86,13 +86,13 @@ chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
 
 === 완료 ===
 재시작됨:
-  - NFI-Binance
+  - nfi-binance
 ```
 → 자동 재시작 완료.
 
 ### 전략 변경됐지만 컨테이너 정지 상태
 ```
-=== [NFI-OKX] ===
+=== [nfi-okx] ===
   my-setup에 3 커밋 앞서있음
   전략 파일 변경됨:
     - NostalgiaForInfinityX7.py
@@ -100,18 +100,18 @@ chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
 
 === 완료 ===
 전략 변경됐지만 정지 상태 (수동 시작 필요):
-  cd D:\OneDrive\Project\NostalgiaForInfinity\NFI-OKX; docker compose up -d
+  cd D:\OneDrive\Project\nostalgia-for-infinity\nfi-okx; docker compose up -d
 ```
 → 의도적으로 정지시켰을 수 있으므로 스크립트가 건드리지 않음. 직접 시작.
 
 ### 설정/문서만 변경
 ```
-=== [NFI-Bybit] ===
+=== [nfi-bybit] ===
   my-setup에 2 커밋 앞서있음
   설정/문서만 변경 → 재시작 불필요
 
 업데이트됨 (재시작 불필요):
-  - NFI-Bybit
+  - nfi-bybit
 ```
 → 전략 .py 변경 없으면 재시작 안 함.
 
@@ -120,21 +120,21 @@ chmod +x ~/projects/NostalgiaForInfinity/update-nfi.sh
 예: pairlist 페어 수를 60 → 40으로 바꾸고 싶을 때.
 
 ```powershell
-# NFI-OKX (또는 아무 폴더)에서
-cd D:\OneDrive\Project\NostalgiaForInfinity\NFI-OKX
+# nfi-okx (또는 아무 폴더)에서
+cd D:\OneDrive\Project\nostalgia-for-infinity\nfi-okx
 git checkout my-setup
 # 파일 편집
 git add configs/pairlist-volume-binance-usdt.json
 git commit -m "config: pair count 60 -> 40"
 git push origin my-setup
 
-# 다시 원래 브랜치로 (NFI-OKX는 my-setup-okx)
+# 다시 원래 브랜치로 (nfi-okx는 my-setup-okx)
 git checkout my-setup-okx
 ```
 
 이후 아무 때나 스크립트 실행:
 ```powershell
-D:\OneDrive\Project\NostalgiaForInfinity\update-nfi.ps1
+D:\OneDrive\Project\nostalgia-for-infinity\update-nfi.ps1
 ```
 
 스크립트가 3개 거래소 브랜치에 변경사항 자동 전파.
@@ -143,9 +143,9 @@ D:\OneDrive\Project\NostalgiaForInfinity\update-nfi.ps1
 
 ### 1. 미커밋 변경 없어야 함
 ```bash
-cd NFI-OKX && git status
-cd ../NFI-Binance && git status
-cd ../NFI-Bybit && git status
+cd nfi-okx && git status
+cd ../nfi-binance && git status
+cd ../nfi-bybit && git status
 ```
 모두 `nothing to commit, working tree clean`이어야 함.
 
@@ -227,14 +227,14 @@ crontab -e
 추가:
 ```
 # 매일 오전 3시 NFI 업데이트 확인
-0 3 * * * /bin/bash /home/ubuntu/projects/NostalgiaForInfinity/update-nfi.sh >> /var/log/nfi-update.log 2>&1
+0 3 * * * /bin/bash /home/ubuntu/projects/nostalgia-for-infinity/update-nfi.sh >> /var/log/nfi-update.log 2>&1
 ```
 
 ### PC: Windows Task Scheduler
 
 - Task Scheduler → Create Task
 - Trigger: Daily 3:00 AM
-- Action: `powershell.exe -File D:\OneDrive\Project\NostalgiaForInfinity\update-nfi.ps1`
+- Action: `powershell.exe -File D:\OneDrive\Project\nostalgia-for-infinity\update-nfi.ps1`
 
 ## 주의
 

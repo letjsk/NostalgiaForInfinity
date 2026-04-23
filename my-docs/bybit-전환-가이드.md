@@ -133,7 +133,7 @@ FREQTRADE__API_SERVER__LISTEN_PORT=9044
 거래소가 바뀌면 드라이런 히스토리는 의미 없음 (페어 구성, 가격 기준 등 다름).
 
 ```bash
-cd ~/projects/NostalgiaForInfinity/user_data
+cd ~/projects/nostalgia-for-infinity/user_data
 
 # 기존 Binance DB 백업 보관 (혹시 나중에 복원용)
 mv NFI_DryRun_binance_futures-tradesv3.sqlite backup-binance-$(date +%Y%m%d).sqlite
@@ -166,7 +166,7 @@ Bybit UI에서 초기 레버리지 설정:
 ## 8단계: 봇 재시작
 
 ```bash
-cd ~/projects/NostalgiaForInfinity
+cd ~/projects/nostalgia-for-infinity
 
 # 컨테이너 정지
 docker compose down
