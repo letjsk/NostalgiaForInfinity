@@ -93,35 +93,43 @@ foreach ($ex in $EXCHANGES) {
 
     Run-Git checkout $ex.Branch
     & git fetch origin 2>&1 | Out-Null
+
+    $before = & git rev-parse HEAD   # 모든 merge 전 기준점
     & git merge --ff-only "origin/$($ex.Branch)" 2>&1 | Out-Null   # 다른 기기 변경 반영
 
     $behind = & git rev-list --count "HEAD..origin/my-setup"
     if ($LASTEXITCODE -ne 0) { throw "rev-list 실패" }
+    $afterSync = & git rev-parse HEAD
 
-    if ([int]$behind -eq 0) {
+    # ff-only merge도 없고 my-setup도 뒤쳐지지 않으면 완전 최신
+    if ($before -eq $afterSync -and [int]$behind -eq 0) {
         Write-Host "  변경 없음"
         continue
     }
 
-    Write-Host "  my-setup에 $behind 커밋 앞서있음" -ForegroundColor Yellow
+    if ([int]$behind -gt 0) {
+        Write-Host "  my-setup에 $behind 커밋 앞서있음" -ForegroundColor Yellow
+        Run-Git merge origin/my-setup --no-edit
+        Run-Git push origin $ex.Branch
+    }
+    else {
+        Write-Host "  원격 $($ex.Branch) 변경사항 반영됨" -ForegroundColor Yellow
+    }
 
-    $before = & git rev-parse HEAD
-    Run-Git merge origin/my-setup --no-edit
-    Run-Git push origin $ex.Branch
     $after = & git rev-parse HEAD
 
-    # 전략 파일(.py) 변경 확인
+    # 전략(.py) 또는 설정(configs/*.json) 변경 확인
     $changed = & git diff --name-only $before $after
-    $pyChanged = $changed | Where-Object { $_ -match "^NostalgiaForInfinity.*\.py$" }
+    $restartWorthy = $changed | Where-Object { $_ -match "^(NostalgiaForInfinity.*\.py|configs/.*\.json)$" }
 
-    if (-not $pyChanged) {
-        Write-Host "  설정/문서만 변경 → 재시작 불필요"
+    if (-not $restartWorthy) {
+        Write-Host "  문서만 변경 → 재시작 불필요"
         $updated += $ex.Folder
         continue
     }
 
-    Write-Host "  전략 파일 변경됨:" -ForegroundColor Yellow
-    $pyChanged | ForEach-Object { Write-Host "    - $_" }
+    Write-Host "  재시작 필요한 변경:" -ForegroundColor Yellow
+    $restartWorthy | ForEach-Object { Write-Host "    - $_" }
 
     # 컨테이너 실행 여부 확인
     $running = & docker compose ps --status running -q 2>$null

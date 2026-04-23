@@ -93,34 +93,41 @@ for entry in "${EXCHANGES[@]}"; do
 
     git checkout "$BRANCH"
     git fetch origin >/dev/null 2>&1
+
+    BEFORE=$(git rev-parse HEAD)   # 모든 merge 전 기준점
     git merge --ff-only "origin/$BRANCH" 2>/dev/null || true   # 다른 기기 변경사항 반영
 
     BEHIND=$(git rev-list --count HEAD..origin/my-setup)
+    AFTER_SYNC=$(git rev-parse HEAD)
 
-    if [ "$BEHIND" -eq 0 ]; then
+    # ff-only merge도 없고 my-setup도 뒤쳐지지 않으면 완전 최신
+    if [ "$BEFORE" = "$AFTER_SYNC" ] && [ "$BEHIND" -eq 0 ]; then
         echo "  변경 없음"
         continue
     fi
 
-    echo -e "${YELLOW}  my-setup에 ${BEHIND} 커밋 앞서있음${NC}"
+    if [ "$BEHIND" -gt 0 ]; then
+        echo -e "${YELLOW}  my-setup에 ${BEHIND} 커밋 앞서있음${NC}"
+        git merge origin/my-setup --no-edit
+        git push origin "$BRANCH"
+    else
+        echo -e "${YELLOW}  원격 $BRANCH 변경사항 반영됨${NC}"
+    fi
 
-    BEFORE=$(git rev-parse HEAD)
-    git merge origin/my-setup --no-edit
-    git push origin "$BRANCH"
     AFTER=$(git rev-parse HEAD)
 
-    # 전략 파일(.py) 변경 확인
+    # 전략(.py) 또는 설정(configs/*.json) 변경 확인
     CHANGED=$(git diff --name-only "$BEFORE" "$AFTER")
-    PY_CHANGED=$(echo "$CHANGED" | grep -E "^NostalgiaForInfinity.*\.py$" || true)
+    RESTART_WORTHY=$(echo "$CHANGED" | grep -E "^(NostalgiaForInfinity.*\.py|configs/.*\.json)$" || true)
 
-    if [ -z "$PY_CHANGED" ]; then
-        echo "  설정/문서만 변경 → 재시작 불필요"
+    if [ -z "$RESTART_WORTHY" ]; then
+        echo "  문서만 변경 → 재시작 불필요"
         UPDATED+=("$FOLDER")
         continue
     fi
 
-    echo -e "${YELLOW}  전략 파일 변경됨:${NC}"
-    echo "$PY_CHANGED" | sed 's/^/    - /'
+    echo -e "${YELLOW}  재시작 필요한 변경:${NC}"
+    echo "$RESTART_WORTHY" | sed 's/^/    - /'
 
     RUNNING=$(docker compose ps --status running -q 2>/dev/null || true)
 
