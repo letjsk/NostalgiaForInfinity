@@ -161,9 +161,7 @@ config*.json
 
 # Don't commit any sqlite file which contains your tradings
 
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
+*.sqlite*
 .env**
 
 # Local tool configs
