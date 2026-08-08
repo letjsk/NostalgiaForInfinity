@@ -71,7 +71,7 @@ class NostalgiaForInfinityX7(IStrategy):
   INTERFACE_VERSION = 3
 
   def version(self) -> str:
-    return "v17.4.512"
+    return "v17.4.515"
 
   stoploss = -0.99
 
@@ -901,6 +901,8 @@ class NostalgiaForInfinityX7(IStrategy):
     "long_entry_condition_161_enable": True,
     "long_entry_condition_162_enable": True,
     "long_entry_condition_163_enable": True,
+    "long_entry_condition_192_enable": False,
+    "long_entry_condition_193_enable": False,
   }
 
   short_entry_signal_params = {
@@ -919,6 +921,8 @@ class NostalgiaForInfinityX7(IStrategy):
     "short_entry_condition_561_enable": False,
     "short_entry_condition_562_enable": True,
     "short_entry_condition_563_enable": False,
+    "short_entry_condition_592_enable": False,
+    "short_entry_condition_593_enable": False,
     # "short_entry_condition_603_enable": True,
     # "short_entry_condition_641_enable": True,
     # "short_entry_condition_642_enable": True,
@@ -4140,6 +4144,15 @@ class NostalgiaForInfinityX7(IStrategy):
     cvd_buy_vol = volume_np * (close_np - low_np) / hl_range_safe
     cvd_sell_vol = volume_np * (high_np - close_np) / hl_range_safe
 
+    # Quad-rotation raw stochastics + pivot windows (signals 192/193 long, 592/593 short — experimental)
+    quad_s93 = ta.STOCHF(high_np, low_np, close_np, fastk_period=9, fastd_period=3, fastd_matype=0)[0]
+    quad_s143 = ta.STOCHF(high_np, low_np, close_np, fastk_period=14, fastd_period=3, fastd_matype=0)[0]
+    quad_s44 = ta.STOCHF(high_np, low_np, close_np, fastk_period=4, fastd_period=4, fastd_matype=0)[0]
+    quad_s6010 = ta.STOCHF(high_np, low_np, close_np, fastk_period=60, fastd_period=10, fastd_matype=0)[0]
+    quad_low_min_12 = pd.Series(low_np).rolling(12).min().to_numpy()
+    quad_high_max_12 = pd.Series(high_np).rolling(12).max().to_numpy()
+    quad_s93_min_12 = pd.Series(quad_s93).rolling(12).min().to_numpy()
+    quad_s93_max_12 = pd.Series(quad_s93).rolling(12).max().to_numpy()
     new_cols = pd.DataFrame(
       {
         "RSI_3": rsi_3,
@@ -4190,6 +4203,14 @@ class NostalgiaForInfinityX7(IStrategy):
         "LARGE_BUBBLE_THR": large_bubble_thr,
         "CVD_BUY_VOL": cvd_buy_vol,
         "CVD_SELL_VOL": cvd_sell_vol,
+        "STOCH_9_3": quad_s93,
+        "STOCH_14_3": quad_s143,
+        "STOCH_4_4": quad_s44,
+        "STOCH_60_10": quad_s6010,
+        "QUAD_LOW_MIN_12": quad_low_min_12,
+        "QUAD_HIGH_MAX_12": quad_high_max_12,
+        "QUAD_S93_MIN_12": quad_s93_min_12,
+        "QUAD_S93_MAX_12": quad_s93_max_12,
       },
       index=df.index,
     )
@@ -12895,6 +12916,14 @@ class NostalgiaForInfinityX7(IStrategy):
     stochrsi_k_1d = np_view("STOCHRSIk_14_14_3_3_1d")
     rsi_3 = np_view("RSI_3")
     close = np_view("close")
+    stoch_9_3 = np_view("STOCH_9_3")
+    stoch_14_3 = np_view("STOCH_14_3")
+    stoch_4_4 = np_view("STOCH_4_4")
+    stoch_60_10 = np_view("STOCH_60_10")
+    quad_low_min_12 = np_view("QUAD_LOW_MIN_12")
+    quad_high_max_12 = np_view("QUAD_HIGH_MAX_12")
+    quad_s93_min_12 = np_view("QUAD_S93_MIN_12")
+    quad_s93_max_12 = np_view("QUAD_S93_MAX_12")
     bbp_20_2_0_4h = np_view("BBP_20_2.0_4h")
     obv_change_pct = np_view("OBV_change_pct")
     open_rate = np_view("open")
@@ -13642,10 +13671,12 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_15m_gt_10) | (rsi_3_4h_gt_60) | (stochrsi_k_4h_lt_90))
             # 15m & 1d down move, 1d high
             & ((rsi_3_15m_gt_10) | (rsi_3_1d_gt_50) | (stochrsi_k_1d_lt_80))
+            # 15m & 1d down move, 1h & 1d high
+            & ((rsi_3_15m_gt_10) | (rsi_3_1d_gt_60) | (aroonu_14_1h_lt_60) | (aroonu_14_1d_lt_100))
             # 15m down move & downtrend, 4h high
-            & ((rsi_3_15m_gt_10) | (cmf_20_15m_gt_neg_0_30) | aroonu_14_4h_lt_100)
+            & ((rsi_3_15m_gt_10) | (cmf_20_15m_gt_neg_0_30) | (aroonu_14_4h_lt_100))
             # 15m down move, 15m & 4h high
-            & ((rsi_3_15m_gt_10) | (aroonu_14_15m_lt_70) | aroonu_14_4h_lt_80)
+            & ((rsi_3_15m_gt_10) | (aroonu_14_15m_lt_70) | (aroonu_14_4h_lt_80))
             # 15m down move, 1h high & overbought
             & ((rsi_3_15m_gt_10) | (aroonu_14_1h_lt_90) | (roc_9_1h_lt_20))
             # 15m down move, 1h high, 1d downtrend
@@ -21632,16 +21663,18 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_1h_gt_45) | (aroonu_14_1h_lt_70) | (aroonu_14_4h_lt_100) | (aroonu_14_1d_lt_100))
             # 1h down move, 4h high, 15m high, 4h high
             & ((rsi_3_1h_gt_45) | (rsi_14_4h_lt_70) | (aroonu_14_15m_lt_70) | (aroonu_14_4h_lt_90))
+            # 1h & 1d down move, 1d high & overbought
+            & ((rsi_3_1h_gt_50) | (rsi_3_1d_gt_65) | (stochrsi_k_1d_lt_80) | (roc_9_1d_lt_20))
+            # 1h down move, 15m high, 1h high, 1d overbought
+            & ((rsi_3_1h_gt_50) | (aroonu_14_15m_lt_60) | (aroonu_14_1h_lt_100) | (roc_9_1d_lt_20))
             # 1h down move, 1h high, 1d high & overbought
             & ((rsi_3_1h_gt_50) | (aroonu_14_1h_lt_80) | (stochrsi_k_1d_lt_70) | (roc_9_1d_lt_10))
             # 1h down move, 4h high, 1h & 4h overbought
             & ((rsi_3_1h_gt_50) | (aroonu_14_4h_lt_80) | (roc_9_1h_lt_20) | (roc_9_4h_lt_30))
             # 1h down move, 4h & 1d high, 4h & 1d overbought
             & ((rsi_3_1h_gt_50) | (aroonu_14_4h_lt_100) | (aroonu_14_1d_lt_100) | (roc_9_4h_lt_30) | (roc_9_1d_lt_40))
-            # 1h & 1d down move, 1d high & overbought
-            & ((rsi_3_1h_gt_50) | (rsi_3_1d_gt_65) | (stochrsi_k_1d_lt_80) | (roc_9_1d_lt_20))
-            # 1h down move, 15m high, 1h high, 1d overbought
-            & ((rsi_3_1h_gt_50) | (aroonu_14_15m_lt_60) | (aroonu_14_1h_lt_100) | (roc_9_1d_lt_20))
+            # 1h down move, 1h high, 4h & 1d overbought
+            & ((rsi_3_1h_gt_50) | (aroonu_14_1d_lt_100) | (roc_9_4h_lt_30) | (roc_9_1d_lt_80))
             # 1h down move, 1h still high, 4h high & overbought
             & ((rsi_3_1h_gt_55) | (stochrsi_k_1h_lt_50) | (stochrsi_k_4h_lt_80) | (roc_9_4h_lt_10))
             # 1h down move, 1h high, 4h overbought
@@ -25784,6 +25817,39 @@ class NostalgiaForInfinityX7(IStrategy):
 
         ###############################################################################################
 
+        # Condition #192 - Quad-rotation stochastic pullback (Long, experimental).
+        if long_entry_condition_index == 192:
+          # --- Protections ---
+          long_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
+          long_entry_logic.append(protections_long_global == True)
+          # Round 1 (API3 loss): block long-divergence with no reversal signs (knife)
+          long_entry_logic.append((rsi_3_15m > 30.0) | (roc_9_1h > 1.0) | (aroond_14 < 90.0) | (cmf_20 > 0.12))
+          # Round 2 (SOL x2 loss): block mid-1h-RSI (55-65) downtrend dip (not oversold enough to bounce)
+          long_entry_logic.append((rsi_14_1h < 55.0) | (rsi_14_1h > 65.0) | (roc_9_1d > 0.0))
+          # Round 3 (RUNE loss): 1d capitulation + money outflow = knife; need 1d alive OR inflow
+          long_entry_logic.append((rsi_3_1d > 15.0) | (cmf_20 > -0.10))
+          # --- Logic: embedded up-regime + quad-oversold pullback + 5-candle shift kink ---
+          long_entry_logic.append(stoch_60_10 > 80.0)
+          long_entry_logic.append(stoch_9_3 < 20.0)
+          long_entry_logic.append(stoch_14_3 < 20.0)
+          long_entry_logic.append(stoch_4_4 < 20.0)
+          long_entry_logic.append(close < np_shift(close, 5))
+          long_entry_logic.append(stoch_9_3 > np_shift(stoch_9_3, 5))
+
+        # Condition #193 - Quad-rotation TRUE pivot divergence (Long, experimental).
+        if long_entry_condition_index == 193:
+          # --- Protections ---
+          long_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
+          long_entry_logic.append(protections_long_global == True)
+          # --- Logic: embedded up-regime + quad-oversold + two-pivot bullish divergence ---
+          long_entry_logic.append(stoch_60_10 > 80.0)
+          long_entry_logic.append(stoch_9_3 < 20.0)
+          long_entry_logic.append(stoch_14_3 < 20.0)
+          long_entry_logic.append(stoch_4_4 < 20.0)
+          # price LOWER-LOW across swing windows while stoch makes a HIGHER-LOW (real divergence)
+          long_entry_logic.append(quad_low_min_12 < np_shift(quad_low_min_12, 12))
+          long_entry_logic.append(quad_s93_min_12 > np_shift(quad_s93_min_12, 12))
+
         long_entry_logic.append(df["volume"] > 0)
         item_long_entry = _and_entry_conditions(long_entry_logic)
         _append_entry_tag(entry_tags, item_long_entry, f"{long_entry_condition_index} ")
@@ -27079,6 +27145,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_15m_gt_20) | (rsi_3_1h_gt_20) | (aroonu_14_4h_gt_0) | (aroonu_14_1d_gt_0))
             # 15m & 1h down move, 1h uptrend
             & ((rsi_3_15m_gt_20) | (rsi_3_1h_gt_20) | (cmf_20_1h_lt_0_10))
+            # 15m & 1h & 4h down move, 1h & 1d low
+            & ((rsi_3_15m_gt_20) | (rsi_3_1h_gt_25) | (rsi_3_4h_gt_25) | (aroonu_14_1h_gt_0) | (aroonu_14_1d_gt_20))
             # 15m & 1h & 4h down move, 1h low, 15m low
             & ((rsi_3_15m_gt_20) | (rsi_3_1h_gt_25) | (rsi_3_4h_gt_25) | (aroonu_14_1h_gt_0) | (stochrsi_k_15m_gt_10))
             # 15m & 1h & 4h down move, 4h downtrend not confirmed, 4h low
@@ -27749,6 +27817,46 @@ class NostalgiaForInfinityX7(IStrategy):
         # SHORT ENTRY CONDITIONS ENDS HERE
 
         ###############################################################################################
+
+        # Condition #592 - Quad-rotation stochastic pullback (Short, experimental).
+        if short_entry_condition_index == 592:
+          # --- Protections ---
+          short_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
+          short_entry_logic.append(protections_short_global == True)
+          # Round 1 (GRIFFAIN loss): block short while uptrend still has legs
+          short_entry_logic.append((roc_9_1d < 2.5) | (aroonu_14 < 100.0) | (aroonu_14_1h < 65.0) | (roc_9_1h < -5.5) | (cmf_20 < 0.0) | (rsi_14_1h > 40.0))
+          # Round 2 (XRP loss)
+          short_entry_logic.append((roc_9_1d < 2.0) | (rsi_14_1h > 42.0) | (rsi_3_15m > 65.0) | (cmf_20 > 0.15) | (aroonu_14_1h > 40.0) | (roc_9_1h < -5.0))
+          # Round 3 (API3/UNI loss)
+          short_entry_logic.append((roc_9_1d < 0.0) | (roc_9_1h < -5.0) | (rsi_14_1h > 32.0) | (mfi_14_15m > 25.0))
+          # Round 4 (EIGEN/DODOX loss)
+          short_entry_logic.append((cmf_20 < 0.15) | (roc_9_1d < -3.0) | (roc_9_1d > 5.0) | (rsi_14_1h > 50.0))
+          # Round 5 (CHZ loss): deep 1d downtrend + heavy money INFLOW at entry = squeeze fuel
+          short_entry_logic.append((mfi_14 < 70.0) | (roc_9_1d > -10.0))
+          # --- Logic: embedded down-regime + quad-overbought bounce + 5-candle shift kink ---
+          short_entry_logic.append(stoch_60_10 < 20.0)
+          short_entry_logic.append(stoch_9_3 > 80.0)
+          short_entry_logic.append(stoch_14_3 > 80.0)
+          short_entry_logic.append(stoch_4_4 > 80.0)
+          short_entry_logic.append(close > np_shift(close, 5))
+          short_entry_logic.append(stoch_9_3 < np_shift(stoch_9_3, 5))
+
+        # Condition #593 - Quad-rotation TRUE pivot divergence (Short, experimental).
+        if short_entry_condition_index == 593:
+          # --- Protections ---
+          short_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
+          short_entry_logic.append(protections_short_global == True)
+          # Round 1 (UNI loss): 1h washed-out + 1d overbought & rising = bounce squeeze; need 1h strength
+          # OR 1d not stretched OR 1d already down OR 4h stoch off the floor
+          short_entry_logic.append((rsi_14_1h > 30.0) | (stochrsi_k_1d < 80.0) | (roc_9_1d < 0.0) | (stochrsi_k_4h > 10.0))
+          # --- Logic: embedded down-regime + quad-overbought + two-pivot bearish divergence ---
+          short_entry_logic.append(stoch_60_10 < 20.0)
+          short_entry_logic.append(stoch_9_3 > 80.0)
+          short_entry_logic.append(stoch_14_3 > 80.0)
+          short_entry_logic.append(stoch_4_4 > 80.0)
+          # price HIGHER-HIGH across swing windows while stoch makes a LOWER-HIGH (real divergence)
+          short_entry_logic.append(quad_high_max_12 > np_shift(quad_high_max_12, 12))
+          short_entry_logic.append(quad_s93_max_12 < np_shift(quad_s93_max_12, 12))
 
         short_entry_logic.append(df["volume"] > 0)
         item_short_entry = _and_entry_conditions(short_entry_logic)
@@ -70975,16 +71083,10 @@ class NostalgiaForInfinityX7(IStrategy):
     last_ema_50_4h = last_candle["EMA_50_4h"]
     last_ema_100_4h = last_candle["EMA_100_4h"]
     last_ema_200_4h = last_candle["EMA_200_4h"]
-    last_aroond_14 = last_candle["AROOND_14"]
-    last_aroond_14_15m = last_candle["AROOND_14_15m"]
-    last_aroond_14_1h = last_candle["AROOND_14_1h"]
-    last_aroond_14_4h = last_candle["AROOND_14_4h"]
-    last_aroond_14_1d = last_candle["AROOND_14_1d"]
     last_roc_9_1h = last_candle["ROC_9_1h"]
     last_roc_9_4h = last_candle["ROC_9_4h"]
     last_roc_9_1d = last_candle["ROC_9_1d"]
     last_stochrsi_k = last_candle["STOCHRSIk_14_14_3_3"]
-    last_stochrsik_15m = last_candle["STOCHRSIk_14_14_3_3_15m"]
     last_stochrsi_k_1h = last_candle["STOCHRSIk_14_14_3_3_1h"]
     last_stochrsi_k_4h = last_candle["STOCHRSIk_14_14_3_3_4h"]
     last_stochrsi_k_1d = last_candle["STOCHRSIk_14_14_3_3_1d"]
@@ -71011,24 +71113,21 @@ class NostalgiaForInfinityX7(IStrategy):
     if last_candle["enter_short"] == True:
       self._grind_entry_tag = "g0"
       return True
-    # g1 — AROOND rally + EMA_16 rise (mirror long g1)
+    # g1 — AROONU rally + EMA_16 rise (mirror long g1)
     if (
       (last_rsi_3 < 90.0)
       and (last_rsi_3_15m < 85.0)
       and (last_rsi_3_1h < 85.0)
       and (last_rsi_3_4h < 85.0)
       and (last_rsi_14 > 55.0)
-      and (last_aroond_14 < 25.0)
-      and (last_aroond_14_4h < 100.0)
+      and (last_aroonu_14 > 75.0)
+      and (last_aroonu_14_4h > 0.0)
       and (last_roc_9_1h > -20.0)
       and (last_close < (last_close_min_48 * 1.10))
       and (last_close > (last_high_max_24_4h * 0.40))
       and (last_close > (last_ema_16 * 1.025))
-      and (last_aroonu_14 > 75.0)
-      and (last_close < (last_close_min_48 * 1.1000))
-      and (last_close > (last_high_max_24_4h * 0.4000))
-      and (last_close > (last_ema_16 * 1.0250))
       and ((last_rsi_3_1h < 65.0) or (last_aroonu_14_1h > 0.0))
+      and ((last_aroonu_14_1h > 0.0) or (last_aroonu_14_1d > 0.0))
       and ((last_aroonu_14_1d > 0.0) or (last_stochrsi_k_1h > 10.0))
     ):
       self._grind_entry_tag = "g1"
@@ -71048,24 +71147,24 @@ class NostalgiaForInfinityX7(IStrategy):
     ):
       self._grind_entry_tag = "g2"
       return True
-    # g3 — AROOND_15m rally + EMA_12 rise (mirror long g3)
+    # g3 — AROONU_15m rally + EMA_12 rise (mirror long g3)
     if (
       (last_rsi_3 < 90.0)
       and (last_rsi_3_15m < 90.0)
       and (last_rsi_3_1h < 90.0)
       and (last_rsi_3_4h < 85.0)
       and (last_rsi_14 > 65.0)
-      and (last_aroond_14_15m < 25.0)
-      and (last_stochrsik_15m > 30.0)
+      and (last_aroonu_14_15m > 75.0)
+      and (last_stochrsi_k_15m > 30.0)
       and (last_stochrsi_k_1h > 10.0)
       and (last_roc_9_1h < 15.0)
       and (last_roc_9_4h < 15.0)
-      and ((last_rsi_3_1h < 80.0) or (last_rsi_3_1d < 80.0))
-      and ((last_rsi_3_4h < 70.0) or (last_stochrsi_k_4h > 40.0))
       and (last_close < (last_close_min_48 * 1.15))
       and (last_close > (last_ema_12 * 1.020))
+      and ((last_rsi_3_1h < 80.0) or (last_rsi_3_1d < 80.0))
       and ((last_rsi_3_1h < 80.0) or (last_stochrsi_k_1d > 30.0))
       and ((last_rsi_3_1h < 75.0) or (last_stochrsi_k_1h > 30.0))
+      and ((last_rsi_3_4h < 70.0) or (last_stochrsi_k_4h > 40.0))
     ):
       self._grind_entry_tag = "g3"
       return True
@@ -71077,9 +71176,10 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_3_4h < 90.0)
       and (last_rsi_3_1d < 90.0)
       and (last_rsi_14 > 65.0)
-      and (last_aroond_14 < 25.0)
+      and (last_aroonu_14 > 75.0)
       and (last_roc_9_1h < 20.0)
       and (last_roc_9_4h < 20.0)
+      # and (last_close < (last_close_min_48 * 1.10))
       and (last_close > (last_ema_26 * 1.030))
       and (last_close > (last_bbu * 1.001))
     ):
@@ -71092,7 +71192,7 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_3_1h < 85.0)
       and (last_rsi_3_4h < 85.0)
       and (last_rsi_14 > 65.0)
-      and (last_aroond_14 < 30.0)
+      and (last_aroonu_14 > 70.0)
       and (last_roc_9_4h < 20.0)
       and (last_close < (last_low_min_24_1h * 1.20))
       and (last_close > (last_high_max_12_4h * 0.50))
@@ -71109,11 +71209,11 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_14 < 65.0)
       and (last_roc_9_1h < 20.0)
       and (last_roc_9_4h < 20.0)
-      and (last_aroond_14 < 25.0)
-      and ((last_aroond_14_1d < 100.0) or (last_roc_9_1d > -50.0))
+      and (last_aroonu_14 > 75.0)
       and (last_close > (last_high_max_12_4h * 0.40))
       and (last_rsi_20 > prev_rsi_20)
       and (last_close > (last_sma_16 * 1.040))
+      and ((last_aroonu_14_1d > 0.0) or (last_roc_9_1d > -50.0))
     ):
       self._grind_entry_tag = "g6"
       return True
@@ -71136,7 +71236,7 @@ class NostalgiaForInfinityX7(IStrategy):
     ):
       self._grind_entry_tag = "g7"
       return True
-    # g8 — EMA_12/26 gap wide (mirror long g8)
+    # g8 — EMA_12/26 gap wide + high_max_24_1h (mirror long g8)
     if (
       (last_rsi_3 > 70.0)
       and (last_rsi_3 < 95.0)
@@ -71145,6 +71245,7 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_3_4h < 90.0)
       and (last_roc_9_1h < 10.0)
       and (last_roc_9_4h < 25.0)
+      # and (last_close > (last_candle["high_max_24_1h"] * 0.70))
       and (last_ema_12 > last_ema_26)
       and ((last_ema_12 - last_ema_26) > (last_open * 0.030))
       and ((prev_ema_12 - prev_ema_26) > (last_open / 100.0))
@@ -71202,30 +71303,28 @@ class NostalgiaForInfinityX7(IStrategy):
       (last_rsi_3 < 95.0)
       and (last_rsi_3_1h < 80.0)
       and (last_rsi_14_1h < 60.0)
-      and (last_stochrsik_15m > 20.0)
+      and (last_stochrsi_k_15m > 20.0)
       and (last_roc_9_1h < 15.0)
       and (last_roc_9_4h < 15.0)
       and (prev_sma_9 > prev_sma_21)
       and (last_sma_9 < last_sma_21)
       and (last_close > (last_ema_100 * 1.025))
-      and (last_stochrsi_k_15m > 20.0)
-      and (last_close > (last_ema_100 * 1.0250))
       and ((last_rsi_3_4h < 60.0) or (last_roc_9_4h > -30.0))
     ):
       self._grind_entry_tag = "g13"
       return True
-    # g14 — SMA_9 cross down + 4h downtrend (mirror long g14)
+    # g14 — SMA_9 cross down + 4h downtrend (trend follower) (mirror long g14)
     if (
       (last_rsi_3 < 95.0)
-      and (last_aroond_14_15m < 50.0)
+      and (last_aroonu_14_15m > 50.0)
       and (last_stochrsi_k > 60.0)
-      and (last_stochrsik_15m > 30.0)
-      and ((last_rsi_3_1h < 60.0) or (last_aroond_14_1h < 80.0))
+      and (last_stochrsi_k_15m > 30.0)
       and (prev_sma_9 > prev_sma_21)
       and (last_sma_9 < last_sma_21)
       and (last_ema_12_4h < last_ema_200_4h)
       and (last_close < (last_close_min_48 * 1.10))
       and ((last_rsi_3_1h < 70.0) or (last_stochrsi_k_1h > 30.0))
+      and ((last_rsi_3_1h < 60.0) or (last_aroonu_14_1h > 20.0))
       and ((last_rsi_3_1d < 75.0) or (last_stochrsi_k_1h > 20.0))
       and ((last_stochrsi_k_1h > 20.0) or (last_stochrsi_k_1d > 10.0))
     ):
@@ -71237,10 +71336,10 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_3 < 95.0)
       and (last_rsi_3_15m < 90.0)
       and (last_rsi_14 > 60.0)
-      and (last_aroond_14 < 25.0)
-      and (last_aroond_14_15m < 30.0)
+      and (last_aroonu_14 > 75.0)
+      and (last_aroonu_14_15m > 70.0)
       and (last_stochrsi_k > 70.0)
-      and (last_stochrsik_15m > 70.0)
+      and (last_stochrsi_k_15m > 70.0)
       and ((last_rsi_3_1h < 70.0) or (last_stochrsi_k_1h > 20.0))
       and ((last_rsi_3_4h < 70.0) or (last_stochrsi_k_4h > 20.0))
       and ((last_rsi_3_1d < 70.0) or (last_stochrsi_k_1d > 20.0))
@@ -71268,7 +71367,7 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_14 > 70.0)
       and (last_stochrsi_k > 70.0)
       and (last_close > (last_ema_20 * 1.025))
-      and (last_close > (last_ema_20 * 1.0250))
+      and ((last_aroonu_14_4h > 0.0) or (last_aroonu_14_1d > 0.0))
     ):
       self._grind_entry_tag = "g17"
       return True
@@ -71297,31 +71396,27 @@ class NostalgiaForInfinityX7(IStrategy):
     ):
       self._grind_entry_tag = "g19"
       return True
-    # g20 — AROOND 4h downtrend pullback (mirror long g20)
+    # g20 — AROONU 4h downtrend bounce fade (mirror long g20)
     if (
       (last_rsi_3 < 90.0)
       and (last_rsi_3_15m < 85.0)
       and (last_rsi_3_1h < 80.0)
       and (last_rsi_14 > 58.0)
       and (last_rsi_14_4h < 50.0)
-      and (last_aroond_14 < 30.0)
-      and (last_aroond_14_4h > 50.0)
-      and (last_roc_9_1d < 15.0)
-      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_4h > -30.0))
-      and (last_ema_50_4h < last_ema_100_4h)
-      and (last_close > (last_close_min_48 * 1.05))
-      and ((last_rsi_3_1h < 50.0) or (last_roc_9_1d > -60.0))
-      and ((last_rsi_3_4h < 60.0) or (last_aroond_14_4h < 90.0))
-      and ((last_rsi_3_4h < 55.0) or (last_aroond_14_4h < 100.0))
       and (last_aroonu_14 > 70.0)
       and (last_aroonu_14_4h < 50.0)
-      and (last_close > (last_close_min_48 * 1.0500))
+      and (last_roc_9_1d < 15.0)
+      and (last_ema_50_4h < last_ema_100_4h)
+      and (last_close > (last_close_min_48 * 1.05))
       and ((last_rsi_3_15m < 80.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_rsi_3_1h < 70.0) or (last_roc_9_4h > -30.0) or (last_roc_9_1d > -30.0))
+      and ((last_rsi_3_1h < 50.0) or (last_roc_9_1d > -60.0))
       and ((last_rsi_3_4h < 60.0) or (last_aroonu_14_4h > 10.0))
       and ((last_rsi_3_4h < 55.0) or (last_aroonu_14_4h > 0.0))
       and ((last_rsi_3_4h < 40.0) or (last_roc_9_4h > -40.0))
       and ((last_aroonu_14_4h > 0.0) or (last_stochrsi_k_1d > 20.0))
+      and ((last_aroonu_14_4h > 0.0) or (last_aroonu_14_1d > 0.0))
+      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_4h > -30.0))
     ):
       self._grind_entry_tag = "g20"
       return True
@@ -71331,12 +71426,14 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_3 < 90.0)
       and (last_rsi_3_15m < 85.0)
       and (last_rsi_14 > 65.0)
-      and (last_aroond_14_15m < 50.0)
+      and (last_aroonu_14_15m > 50.0)
       and (last_close > (last_ema_20 * 1.045))
     ):
       self._grind_entry_tag = "g21"
       return True
-    # g22 — early breakdown rebuild: rejecting off the high BEFORE the 4h trend confirms (mirror long g22)
+    # g22 — early breakdown rebuild: rejecting off the high BEFORE the 4h trend confirms (g14 needs
+    #        EMA_12_4h < EMA_200_4h and fires too late for a deep-derisk rejection). Anti-fake-drop gating via
+    #        multi-TF RSI weakness + rejection off the 4h high + not-extended. (mirror long g22)
     if (
       (last_rsi_3 < 70.0)
       and (last_rsi_3_15m < 70.0)
@@ -71344,44 +71441,43 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_14_1h < 55.0)
       and (last_roc_9_1h < 0.0)
       and (last_roc_9_4h < 10.0)
+      # anti-capitulation: even at a formed top, a capitulative 4h overshoot reverses (dead-bounce).
       and (last_roc_9_4h > -25.0)
-      and (last_aroond_14_4h < 50.0)
+      # breakdown-started gate: only rebuild once the 4h top is IN (not still making new highs).
+      # AROONU high = a fresh 4h high was just made = still pumping; require it high = top formed.
+      and (last_aroonu_14_4h > 50.0)
+      # aggressive risk-free: g22 fires ONLY well above the 4h 200-EMA (fresh breakdown zone). The
+      # near/below-EMA overextended-drop zone is where dead-bounces live — g23 (extended-continuation)
+      # backstops the real breakdowns below. So g22 stays clean, g23 captures the continuation.
       and (last_close > last_ema_200_4h)
       and (last_close < (last_high_max_12_4h * 0.90))
       and (last_close < (last_ema_20 * 1.03))
       and (last_close > (last_ema_20 * 0.98))
-      and ((last_rsi_3_4h < 50.0) or (last_aroond_14_1h < 100.0))
-      and ((last_rsi_3_1d < 90.0) or (last_aroond_14_1d < 70.0))
-      and ((last_rsi_3_1d < 60.0) or (last_stochrsi_k_1h > 20.0))
-      and ((last_rsi_3_1d < 60.0) or (last_stochrsi_k_4h > 20.0))
-      and ((last_rsi_3_1d < 55.0) or (last_aroond_14_1h < 100.0))
-      and ((last_rsi_3_1d < 55.0) or (last_aroond_14_4h < 100.0))
-      and ((last_rsi_3_1d < 55.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_rsi_3_1d < 55.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_15m < 80.0) or (last_stochrsik_15m > 20.0))
-      and ((last_roc_9_1d < 20.0) or (last_aroond_14_4h < 100.0))
-      and ((last_roc_9_1d < 20.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_roc_9_1d < 30.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_rsi_3_1h < 70.0) or (last_stochrsi_k_1d > 20.0))
-      and (last_aroonu_14_4h > 50.0)
-      and (last_close < (last_high_max_12_4h * 0.9000))
-      and (last_close < (last_ema_20 * 1.0300))
-      and (last_close > (last_ema_20 * 0.9800))
       and ((last_rsi_3_1h < 65.0) or (last_aroonu_14_1d > 0.0))
       and ((last_rsi_3_4h < 50.0) or (last_aroonu_14_1h > 0.0))
       and ((last_rsi_3_1d < 90.0) or (last_aroonu_14_1d > 30.0))
       and ((last_rsi_3_1d < 90.0) or (last_stochrsi_k_4h > 30.0))
+      and ((last_rsi_3_1d < 60.0) or (last_stochrsi_k_1h > 20.0))
+      and ((last_rsi_3_1d < 60.0) or (last_stochrsi_k_4h > 20.0))
       and ((last_rsi_3_1d < 55.0) or (last_aroonu_14_1h > 0.0))
       and ((last_rsi_3_1d < 55.0) or (last_aroonu_14_4h > 0.0))
+      and ((last_rsi_3_1d < 55.0) or (last_stochrsi_k_1h > 10.0))
+      and ((last_rsi_3_1d < 55.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_rsi_3_1d < 35.0) or (last_aroonu_14_1h > 30.0) or (last_aroonu_14_1d > 10.0))
       and ((last_aroonu_14_15m > 20.0) or (last_stochrsi_k_15m > 20.0))
       and ((last_aroonu_14_15m > 20.0) or (last_aroonu_14_1h > 0.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_roc_9_1d < 20.0) or (last_aroonu_14_4h > 0.0))
+      and ((last_roc_9_1d < 20.0) or (last_stochrsi_k_4h > 10.0))
+      and ((last_roc_9_1d < 30.0) or (last_stochrsi_k_1h > 10.0))
     ):
       self._grind_entry_tag = "g22"
       return True
-    # g23 — breakdown-continuation scalp: extended zone BELOW g22's EMA_20*0.98 cap (mirror long g23)
+    # g23 — breakdown-continuation scalp: extended zone BELOW g22's EMA_20*0.98 cap. Only rides a CONFIRMED
+    # continuation (price already declining past the rejection), so dead-bounces (which roll over before
+    # reaching the extended zone) are structurally avoided. Complements g22: g22 = early breakdown-start,
+    # g23 = confirmed continuation. (mirror long g23)
     if (
       (last_rsi_3 < 70.0)
       and (last_rsi_3_15m < 70.0)
@@ -71389,44 +71485,28 @@ class NostalgiaForInfinityX7(IStrategy):
       and (last_rsi_14_1h < 50.0)
       and (last_roc_9_1h < 0.0)
       and (last_roc_9_4h < 0.0)
+      # anti-capitulation blow-off + anti-exhaustion bottom
       and (last_roc_9_4h > -25.0)
       and ((last_stochrsi_k > 3.0) or (last_rsi_14 > 20.0))
       and (last_close < (last_high_max_12_4h * 0.90))
+      # extended zone: below g22's 0.98*EMA cap = continuation confirmed, not a rejection
       and (last_close <= (last_ema_20 * 0.98))
       and (last_close > (last_ema_20 * 0.88))
-      and ((last_rsi_3_4h < 50.0) or (last_aroond_14_4h < 70.0))
-      and ((last_rsi_3_1d < 85.0) or (last_stochrsi_k_1h > 20.0))
-      and ((last_rsi_3_1d < 70.0) or (last_aroond_14_1h < 100.0))
-      and ((last_rsi_3_1d < 70.0) or (last_aroond_14_4h < 100.0))
-      and ((last_rsi_3_1d < 50.0) or (last_stochrsi_k_1h > 20.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_15m < 100.0) or (last_aroond_14_1h < 100.0))
-      and ((last_aroond_14_15m < 100.0) or (last_aroond_14_4h < 100.0))
-      and ((last_aroond_14_15m < 100.0) or (last_aroond_14_1d < 100.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsi_k_1h > 20.0))
-      and ((last_aroond_14_4h < 70.0) or (last_roc_9_1d > -50.0))
-      and ((last_stochrsik_15m > 20.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_stochrsik_15m > 10.0) or (last_aroond_14_1h < 100.0))
-      and ((last_stochrsik_15m > 10.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_stochrsi_k_1h > 10.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_rsi_3_1h < 55.0) or (last_aroond_14_4h < 80.0))
-      and ((last_rsi_3_4h < 60.0) or (last_stochrsik_15m > 10.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsik_15m > 10.0) or (last_stochrsi_k_1d > 20.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_1h < 100.0) or (last_aroond_14_4h < 100.0))
-      and ((last_aroond_14_4h < 100.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_aroond_14_4h < 100.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_1d < 100.0) or (last_stochrsik_15m > 10.0))
-      and (last_close < (last_high_max_12_4h * 0.9000))
-      and (last_close > (last_ema_20 * 0.8800))
       and ((last_rsi_3_1h < 55.0) or (last_aroonu_14_4h > 20.0))
       and ((last_rsi_3_4h < 60.0) or (last_stochrsi_k_15m > 10.0))
       and ((last_rsi_3_4h < 50.0) or (last_aroonu_14_4h > 30.0))
+      and ((last_rsi_3_1d < 85.0) or (last_stochrsi_k_1h > 20.0))
       and ((last_rsi_3_1d < 70.0) or (last_aroonu_14_1h > 0.0))
       and ((last_rsi_3_1d < 70.0) or (last_aroonu_14_4h > 0.0))
+      and ((last_rsi_3_1d < 50.0) or (last_stochrsi_k_1h > 20.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_rsi_3_1d < 45.0) or (last_aroonu_14_15m > 0.0) or (last_stochrsi_k_15m > 10.0))
+      and ((last_aroonu_14_15m > 0.0) or (last_aroonu_14_1h > 0.0))
+      and ((last_aroonu_14_15m > 0.0) or (last_aroonu_14_4h > 0.0))
+      and ((last_aroonu_14_15m > 0.0) or (last_aroonu_14_1d > 0.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_15m > 10.0) or (last_stochrsi_k_1d > 20.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_1h > 20.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_4h > 10.0))
+      and ((last_aroonu_14_1h > 0.0) or (last_aroonu_14_4h > 0.0))
       and ((last_aroonu_14_4h > 30.0) or (last_roc_9_1d > -50.0))
       and ((last_aroonu_14_4h > 0.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_aroonu_14_4h > 0.0) or (last_stochrsi_k_4h > 10.0))
@@ -71434,11 +71514,14 @@ class NostalgiaForInfinityX7(IStrategy):
       and ((last_stochrsi_k_15m > 20.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_stochrsi_k_15m > 10.0) or (last_aroonu_14_1h > 0.0))
       and ((last_stochrsi_k_15m > 10.0) or (last_stochrsi_k_4h > 10.0))
+      and ((last_stochrsi_k_1h > 10.0) or (last_stochrsi_k_4h > 10.0))
+      and ((last_stochrsi_k_1h > 10.0) or (last_stochrsi_k_4h > 10.0))
     ):
       self._grind_entry_tag = "g23"
       return True
 
-    # g24 mirror — downtrend-continuation short-add: the zone BELOW the 4h 200-EMA that g22 sacrifices (mirror of long g24).
+    # g24 — downtrend-bounce continuation add: the zone BELOW the 4h 200-EMA that g22 explicitly sacrifices.
+    # (mirror long g24)
     if (
       # momentum healthy on the bounce: RSI holds down (a real reversal spikes RSI hard)
       (last_rsi_3 < 80.0)
@@ -71451,34 +71534,9 @@ class NostalgiaForInfinityX7(IStrategy):
       # bear scope-gate: confirmed 4h downtrend + price below the 200-EMA regime (complements g22's >200EMA)
       and (last_ema_12_4h < last_ema_200_4h)
       and (last_close < last_ema_200_4h)
-      # shallow bounce to the short EMA — short the bounce WITHIN the trend, never the bottom nor a deep pump
+      # shallow bounce to the short EMA — short the bounce WITHIN the trend, never the bottom nor a deep dump
       and (last_close > (last_ema_20 * 0.99))
       and (last_close < (last_ema_20 * 1.06))
-      and ((last_rsi_3_15m < 60.0) or (last_stochrsik_15m > 30.0))
-      and ((last_rsi_3_1h < 75.0) or (last_aroond_14_1h < 80.0))
-      and ((last_rsi_3_4h < 50.0) or (last_stochrsi_k_4h > 20.0))
-      and ((last_rsi_14_1h > 30.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_15m < 100.0) or (last_aroond_14_1h < 100.0))
-      and ((last_aroond_14_15m < 100.0) or (last_aroond_14_4h < 100.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_15m < 100.0) or (last_stochrsi_k_1d > 20.0))
-      and ((last_aroond_14_1h < 100.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_1h < 100.0) or (last_stochrsi_k_1d > 10.0))
-      and ((last_aroond_14_4h < 100.0) or (last_aroond_14_1d < 100.0))
-      and ((last_aroond_14_4h < 100.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_aroond_14_4h < 100.0) or (last_stochrsi_k_4h > 10.0))
-      and ((last_aroond_14_1d < 100.0) or (last_stochrsik_15m > 10.0))
-      and ((last_aroond_14_1d < 100.0) or (last_stochrsi_k_1h > 10.0))
-      and ((last_aroond_14_1d < 100.0) or (last_stochrsi_k_4h > 10.0))
-      # do not short an oversold bottom on the bounce
-      and ((last_stochrsi_k > 10.0) or (last_rsi_14 > 30.0))
-      and ((last_stochrsik_15m > 10.0) or (last_stochrsi_k_1d > 10.0))
-      and ((last_stochrsi_k_1h > 10.0) or (last_roc_9_4h > -15.0))
-      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_4h > -15.0))
-      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_1d < 15.0))
-      and (last_close > (last_ema_20 * 0.9900))
-      and (last_close < (last_ema_20 * 1.0600))
       and ((last_rsi_3_15m < 60.0) or (last_stochrsi_k_15m > 30.0))
       and ((last_rsi_3_1h < 85.0) or (last_aroonu_14_4h > 30.0))
       and ((last_rsi_3_1h < 75.0) or (last_rsi_3_1d < 55.0) or (last_aroonu_14_1d > 30.0))
@@ -71493,10 +71551,14 @@ class NostalgiaForInfinityX7(IStrategy):
       and ((last_rsi_3_1h < 35.0) or (last_aroonu_14_1h > 30.0) or (last_aroonu_14_1d > 10.0))
       and ((last_rsi_3_4h < 75.0) or (last_roc_9_1d > -30.0))
       and ((last_rsi_3_4h < 55.0) or (last_aroonu_14_4h > 30.0))
+      and ((last_rsi_3_4h < 50.0) or (last_stochrsi_k_4h > 20.0))
       and ((last_rsi_3_1d < 65.0) or (last_stochrsi_k_15m > 10.0))
       and ((last_rsi_3_1d < 65.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_rsi_3_1d < 65.0) or (last_stochrsi_k_4h > 20.0))
+      and ((last_rsi_14_1h > 30.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_aroonu_14_15m > 10.0) or (last_aroonu_14_1h > 0.0) or (last_stochrsi_k_1h > 20.0))
+      and ((last_aroonu_14_15m > 0.0) or (last_aroonu_14_1h > 0.0))
+      and ((last_aroonu_14_15m > 0.0) or (last_aroonu_14_4h > 0.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_aroonu_14_15m > 0.0) or (last_stochrsi_k_1d > 20.0))
@@ -71504,16 +71566,22 @@ class NostalgiaForInfinityX7(IStrategy):
       and ((last_aroonu_14_1h > 0.0) or (last_stochrsi_k_1d > 10.0))
       and ((last_aroonu_14_4h > 20.0) or (last_aroonu_14_1d > 0.0) or (last_roc_9_1d > -20.0))
       and ((last_aroonu_14_4h > 10.0) or (last_roc_9_1d > -30.0))
+      and ((last_aroonu_14_4h > 0.0) or (last_aroonu_14_1d > 0.0))
       and ((last_aroonu_14_4h > 0.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_aroonu_14_4h > 0.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_aroonu_14_1d > 0.0) or (last_stochrsi_k_15m > 10.0))
       and ((last_aroonu_14_1d > 0.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_aroonu_14_1d > 0.0) or (last_stochrsi_k_4h > 10.0))
       and ((last_aroonu_14_1d > 0.0) or (last_roc_9_4h > -15.0) or (last_roc_9_1d > -50.0))
+      # do not short an oversold bottom on the bounce
+      and ((last_stochrsi_k > 10.0) or (last_rsi_14 > 30.0))
       and ((last_stochrsi_k_15m > 10.0) or (last_stochrsi_k_1h > 10.0))
       and ((last_stochrsi_k_15m > 10.0) or (last_stochrsi_k_1d > 10.0))
       and ((last_stochrsi_k_1h > 20.0) or (last_stochrsi_k_1d > 10.0))
       and ((last_stochrsi_k_1h > 20.0) or (last_roc_9_1d < 20.0))
+      and ((last_stochrsi_k_1h > 10.0) or (last_roc_9_4h > -15.0))
+      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_4h > -15.0))
+      and ((last_stochrsi_k_4h > 10.0) or (last_roc_9_1d < 15.0))
       and ((last_stochrsi_k_1d > 10.0) or (last_roc_9_4h > -20.0))
     ):
       self._grind_entry_tag = "g24"
