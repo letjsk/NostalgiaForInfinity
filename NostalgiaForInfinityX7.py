@@ -71,7 +71,7 @@ class NostalgiaForInfinityX7(IStrategy):
   INTERFACE_VERSION = 3
 
   def version(self) -> str:
-    return "v17.4.537"
+    return "v17.4.543"
 
   stoploss = -0.99
 
@@ -129,7 +129,7 @@ class NostalgiaForInfinityX7(IStrategy):
   # Long Quick mode tags
   long_quick_mode_tags = ["41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53"]
   # Long rebuy mode tags
-  long_rebuy_mode_tags = ["61", "62", "63", "64", "65"]
+  long_rebuy_mode_tags = ["61", "62", "63", "64", "65", "68"]
   # Long high profit mode tags
   long_high_profit_mode_tags = ["81", "82"]
   # Long rapid mode tags
@@ -750,7 +750,6 @@ class NostalgiaForInfinityX7(IStrategy):
     "CAKE",
     "CRV",
     "DOGE",
-    "DOT",
     "DYDX",
     "ETC",
     "ETH",
@@ -892,6 +891,7 @@ class NostalgiaForInfinityX7(IStrategy):
     "long_entry_condition_63_enable": True,
     "long_entry_condition_64_enable": True,
     "long_entry_condition_65_enable": True,
+    "long_entry_condition_68_enable": False,
     "long_entry_condition_101_enable": True,
     "long_entry_condition_102_enable": True,
     "long_entry_condition_103_enable": True,
@@ -13238,6 +13238,9 @@ class NostalgiaForInfinityX7(IStrategy):
     rsi_3_change_pct_1d = np_view("RSI_3_change_pct_1d")
     rsi_14_change_pct_1h = np_view("RSI_14_change_pct_1h")
     roc_2_1h = np_view("ROC_2_1h")
+    roc_2_4h = np_view("ROC_2_4h")
+    change_pct_15m = np_view("change_pct_15m")
+    cci_20_15m = np_view("CCI_20_15m")
     aroond_14_1d = np_view("AROOND_14_1d")
     bot_wick_pct_1d = np_view("bot_wick_pct_1d")
     low_min_12_1h = np_view("low_min_12_1h")
@@ -13246,6 +13249,8 @@ class NostalgiaForInfinityX7(IStrategy):
     stochk_14_3_3_1h = np_view("STOCHk_14_3_3_1h")
     uo_7_14_28_15m = np_view("UO_7_14_28_15m")
     stochk_14_3_3_4h = np_view("STOCHk_14_3_3_4h")
+    stochk_14_3_3_1d = np_view("STOCHk_14_3_3_1d")
+    willr_14_1d = np_view("WILLR_14_1d")
     uo_7_14_28_change_pct_15m = np_view("UO_7_14_28_change_pct_15m")
     stochrsi_k_change_pct_4h = np_view("STOCHRSIk_14_14_3_3_change_pct_4h")
     willr_480 = np_view("WILLR_480")
@@ -14135,6 +14140,35 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((close > (high_max_24_4h * 0.20)) | aroonu_14_1h_lt_70)
             # big drop in the last 20 days, 1d high, 1d downtrend
             & ((close > (high_max_20_1d * 0.20)) | (stochrsi_k_1d_lt_70) | (roc_9_1d_gt_neg_15))
+            # the daily low is not fresh at all, the hour has stopped falling, the 15m oscillator
+            # is up and the hourly one is below mid-band: a market turning, not breaking
+            & ((aroond_14_1d > 0.0) | (roc_2_1h > -2.5) | (uo_7_14_28_15m > 42.0) | (uo_7_14_28_1h < 46.0))
+            # the daily low is recent, 4h money flow clearly negative, the base money flow already
+            # at zero and a squeeze behind it: the sell-off is finished and coiling
+            & ((aroond_14_1d > 50.0) | (cmf_20_4h < -0.1) | (mfi_14 > 5.0) | (sqz_cnt_24 > 4.0))
+            # daily money flow rich, the base RSI already low, the daily RSI_3 snapping up and the
+            # hourly stochastic off its floor: nothing left underneath on any timeframe
+            & ((mfi_14_1d < 60.0) | (rsi_14 < 28.0) | (rsi_3_change_pct_1d < 50.0) | (stochk_14_3_3_1h > 15.0))
+            # daily money flow negative while the base RSI is dropping, the 15m is not selling and
+            # the hour is red: the day is already priced in (4 losses, free in all three years)
+            & (
+              (cmf_20_1d < -0.05)
+              | (rsi_14_change_pct < -10.0)
+              | (rsi_3_change_pct_15m > -70.0)
+              | (change_pct_1h < -1.0)
+            )
+            # the daily RSI is not strong, the 15m RSI_3 is not washed, the hourly oscillator is
+            # below mid-band and the hour is flat: a quiet market with no leg to sell (3 losses)
+            & ((rsi_14_1d < 55.0) | (rsi_3_15m > 15.0) | (uo_7_14_28_1h < 46.0) | (change_pct_1h > -2.0))
+            # daily money flow rich, the hour barely down, the 4h nowhere near its low and the day
+            # up more than 2%: shorting strength on every timeframe at once (3 losses)
+            & ((mfi_14_1d < 60.0) | (roc_9_1h > -2.0) | (willr_14_4h < -40.0) | (change_pct_1d > 2.0))
+            # no daily high behind it, base money flow drained, a loose pre-break base and the 15m
+            # no longer falling: a tired market, not a breaking one (4 losses, all in 2022)
+            & ((aroonu_14_1d > 0.0) | (mfi_14 > 15.0) | (ph_pre_tight > 1.0) | (roc_9_15m > -1.0))
+            # no daily high, the daily RSI_3 is washed, hourly RSI_3 snapping up and the 15m
+            # oscillator off its floor: the daily leg is finished (4 losses)
+            & ((aroonu_14_1d > 0.0) | (rsi_3_1d > 40.0) | (rsi_3_change_pct_1h < -20.0) | (stochrsi_k_15m > 10.0))
           )
 
           # Logic
@@ -15668,6 +15702,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_gt_3) | (rsi_3_1d_gt_20) | (stochrsi_k_15m_lt_40))
             # 5m down move, 1h high, 4h overbought
             & ((rsi_3_gt_3) | (stochrsi_k_1h_lt_80) | (roc_9_4h_lt_20))
+            # 5m down move, 1d overbought
+            & ((rsi_3_gt_3) | (roc_9_1d_lt_80))
             # 5m & 1h & 4h down move
             & ((rsi_3_gt_5) | (rsi_3_1h_gt_5) | (rsi_3_4h_gt_5))
             # 5m & 4h down move, 15m still high
@@ -15758,6 +15794,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_15m_gt_25) | (aroonu_14_4h_lt_60) | (roc_9_4h_lt_50))
             # 15m & 1h down move, 4h high
             & ((rsi_3_15m_gt_30) | (rsi_3_1h_gt_40) | (aroonu_14_4h_lt_85))
+            # 15m down move, 1d high & overbought
+            & ((rsi_3_15m_gt_30) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 15m & 1h down move, 4h overbought
             & ((rsi_3_15m_gt_40) | (rsi_3_1h_gt_50) | (roc_9_4h_lt_50))
             # 1h & 4h down move
@@ -15918,6 +15956,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_4h_gt_40) | (stochrsi_k_1d_lt_90) | (roc_9_1d_lt_200))
             # 4h down move, 4h high, 1d downtrend
             & ((rsi_3_4h_gt_45) | (aroonu_14_4h_lt_70) | (roc_9_1d_gt_neg_30))
+            # 4h down move, 1d high & overbought
+            & ((rsi_3_4h_gt_45) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 4h down move, 4h high & overbought
             & ((rsi_3_4h_gt_60) | (aroonu_14_4h_lt_70) | (roc_9_4h_lt_10))
             # 4h down move, 4h & 1d overbought
@@ -17282,7 +17322,7 @@ class NostalgiaForInfinityX7(IStrategy):
           long_entry_logic.append(cci_20_1h > -200.0)
           long_entry_logic.append(cci_20_change_pct_1h > 0.0)
           long_entry_logic.append(aroonu_14_15m > 50.0)
-          long_entry_logic.append(aroonu_14 > 25.0)
+          long_entry_logic.append(aroonu_14 > 30.0)
           long_entry_logic.append(rsi_14 < 45.0)
           long_entry_logic.append(rsi_14 > 20.0)
           long_entry_logic.append(mfi_14 > 30.0)
@@ -18830,9 +18870,11 @@ class NostalgiaForInfinityX7(IStrategy):
             # 5m & 1d down move, 1d still not low enough
             & ((rsi_3_gt_3) | (rsi_3_1d_gt_15) | (aroonu_14_1d_lt_30))
             # 5m down move, 1h & 4h high
-            & ((rsi_3_gt_3) | aroonu_14_1h_lt_80 | aroonu_14_4h_lt_100)
+            & ((rsi_3_gt_3) | (aroonu_14_1h_lt_80) | (aroonu_14_4h_lt_100))
             # 5m down move, 4h high & overbought
-            & ((rsi_3_gt_3) | aroonu_14_4h_lt_100 | (roc_9_4h_lt_20))
+            & ((rsi_3_gt_3) | (aroonu_14_4h_lt_100) | (roc_9_4h_lt_20))
+            # 5m down move, 1d high & overbought
+            & ((rsi_3_gt_3) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 5m down move, 1h high, 4h overbought
             & ((rsi_3_gt_3) | (stochrsi_k_1h_lt_80) | (roc_9_4h_lt_20))
             # 5m down move, 1d high & overbought
@@ -18941,6 +18983,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_15m_gt_5) | (aroonu_14_1h_lt_80) | (roc_9_4h_lt_10))
             # 15m down move, 4h high & overbought
             & ((rsi_3_15m_gt_5) | (aroonu_14_4h_lt_80) | (roc_9_4h_lt_50))
+            # 15m down move, 1d high & overbought
+            & ((rsi_3_15m_gt_5) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 15m down move, 1d still high, 1d downtrend
             & ((rsi_3_15m_gt_5) | (stochrsi_k_1d_lt_50) | (roc_9_1d_gt_neg_20))
             # 15m down move, 1d downtrend
@@ -20509,9 +20553,11 @@ class NostalgiaForInfinityX7(IStrategy):
             # 5m & 1h down move, 1h still not low enough
             ((rsi_3_gt_3) | (rsi_3_1h_gt_10) | (aroonu_14_1h_lt_30))
             # 5m & 1h down move, 1d high
-            & ((rsi_3_gt_3) | rsi_3_1h_gt_20 | aroonu_14_1d_lt_100)
+            & ((rsi_3_gt_3) | (rsi_3_1h_gt_20) | (aroonu_14_1d_lt_100))
             # 5m & 4h down move, 4h high
             & ((rsi_3_gt_3) | (rsi_3_4h_gt_25) | aroonu_14_4h_lt_70)
+            # 5m down move, 1d high & overbought
+            & ((rsi_3_gt_3) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 5m down move, 1d high & overbought
             & ((rsi_3_gt_3) | (stochrsi_k_1d_lt_90) | (roc_9_1d_lt_20))
             # 5m & 1h & 4h down move
@@ -20570,6 +20616,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_15m_gt_5) | (aroonu_14_15m_lt_50))
             # 15m down move, 1h high & overbought
             & ((rsi_3_15m_gt_5) | (aroonu_14_1h_lt_70) | (roc_9_1h_lt_10))
+            # 15m down move, 1d high & overbought
+            & ((rsi_3_15m_gt_5) | (aroonu_14_1d_lt_80) | (roc_9_1d_lt_100))
             # 15m down move, 1h & 1d high
             & ((rsi_3_15m_gt_5) | (roc_9_1h_lt_10) | (roc_9_1d_lt_40))
             # 15m & 1h down move, 1d high
@@ -20790,12 +20838,12 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_4h_gt_15) | (aroonu_14_4h_lt_60) | (roc_9_1h_gt_neg_20))
             # 4h down move, 4h & 1d high
             & ((rsi_3_4h_gt_15) | aroonu_14_4h_lt_70 | (aroonu_14_1d_lt_70))
-            # 4h down move, 1d high & overbought
-            & (rsi_3_4h_gt_20 | (aroonu_14_1d_lt_80) | roc_9_1d_lt_50)
             # 4h down move, 1h still not low enough, 1d downtrend
             & ((rsi_3_4h_gt_15) | (stochrsi_k_1h_lt_20) | (roc_9_1d_gt_neg_20))
+            # 4h down move, 1d high & overbought
+            & ((rsi_3_4h_gt_20) | (aroonu_14_1d_lt_80) | roc_9_1d_lt_50)
             # 4h down move, 4h still high, 1d downtrend
-            & (rsi_3_4h_gt_20 | (stochrsi_k_4h_lt_40) | (roc_9_1d_gt_neg_20))
+            & ((rsi_3_4h_gt_20) | (stochrsi_k_4h_lt_40) | (roc_9_1d_gt_neg_20))
             # 4h down move, 4h still high, 1d downtrend
             & ((rsi_3_4h_gt_25) | (aroonu_14_4h_lt_50) | (roc_9_1d_gt_neg_40))
             # 4h down move, 4h still high, 1d downtrend
@@ -22052,6 +22100,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_1h_gt_50) | (rsi_3_1d_gt_65) | (stochrsi_k_1d_lt_80) | (roc_9_1d_lt_20))
             # 1h down move, 15m high, 1h high, 1d overbought
             & ((rsi_3_1h_gt_50) | (aroonu_14_15m_lt_60) | (aroonu_14_1h_lt_100) | (roc_9_1d_lt_20))
+            # 1h down move, 1h high, 1d high, 4h overbought
+            & ((rsi_3_1h_gt_50) | (aroonu_14_1h_lt_70) | (aroonu_14_1d_lt_100) | (roc_9_4h_lt_20))
             # 1h down move, 1h high, 1d high & overbought
             & ((rsi_3_1h_gt_50) | (aroonu_14_1h_lt_80) | (stochrsi_k_1d_lt_70) | (roc_9_1d_lt_10))
             # 1h down move, 4h high, 1h & 4h overbought
@@ -22334,6 +22384,33 @@ class NostalgiaForInfinityX7(IStrategy):
             & (close > bbu_20_2_0)
             & (ema_12 > ema_26)
           )
+
+        # Condition #68 - Triple Oversold Flush + Volume Accumulation (Long).
+        if long_entry_condition_index == 68:
+          long_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
+          long_entry_logic.append(protections_long_global == True)
+          long_entry_logic.append(global_protections_long_pump == True)
+          long_entry_logic.append(global_protections_long_dump == True)
+          long_entry_logic.append(rsi_14_1d > 25.0)
+          long_entry_logic.append(rsi_14_4h > 20.0)
+          long_entry_logic.append(roc_9_1d > -25.0)
+          long_entry_logic.append(
+            ((rsi_3 > 2.0) | (rsi_3_15m > 5.0) | (rsi_3_1h > 10.0))
+            & ((rsi_3_15m > 3.0) | (rsi_3_1h > 10.0) | (aroonu_14_4h < 90.0))
+            & ((rsi_3_1h > 5.0) | (rsi_3_4h > 15.0) | (stochrsi_k_4h < 50.0))
+            & ((rsi_3_15m > 5.0) | (rsi_3_4h > 20.0) | (roc_9_1d > -15.0))
+            & ((rsi_3_1h > 10.0) | (roc_9_4h > -15.0) | (cmf_20_4h > -0.20))
+          )
+          long_entry_logic.append((rsi_14_1h > 25.0) | (rsi_14_4h > 25.0) | (rsi_3_1d > 15.0))
+          long_entry_logic.append(rsi_3 < 5.0)
+          long_entry_logic.append(rsi_14 < 28.0)
+          long_entry_logic.append(stochrsi_k < 3.0)
+          long_entry_logic.append(willr_14 < -97.0)
+          long_entry_logic.append(cmf_20 > 0.05)
+          long_entry_logic.append(mfi_14 > 25.0)
+          long_entry_logic.append(close < bbl_20_2_0)
+          long_entry_logic.append(rsi_14_1h > 35.0)
+          long_entry_logic.append(aroonu_14_4h > 25.0)
 
         # Condition #101 - Rapid mode (Long).
         if long_entry_condition_index == 101:
@@ -25401,7 +25478,7 @@ class NostalgiaForInfinityX7(IStrategy):
             # 15m down move, 15m still not low enough, 4h high
             & ((rsi_3_15m_gt_50) | (stochrsi_k_15m_lt_30) | (stochrsi_k_4h_lt_90))
             # 15m down move, 15m still high, 1d overbought
-            & ((rsi_3_15m_gt_50) | (aroonu_14_15m_lt_50) | roc_9_1d_lt_50)
+            & ((rsi_3_15m_gt_50) | (aroonu_14_15m_lt_50) | (roc_9_1d_lt_50))
             # 15m down move, 15m still high, 1h high
             & ((rsi_3_15m_gt_55) | (stochrsi_k_15m_lt_40) | (stochrsi_k_1h_lt_70))
             # 15m down move, 15m still high, 4h high
@@ -25412,6 +25489,7 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_1h_gt_25) | (aroonu_14_4h_lt_50) | (stochrsi_k_1d_lt_90))
             # 1h & 4h down move, 1h still high
             & ((rsi_3_1h_gt_30) | (rsi_3_4h_gt_65) | (aroonu_14_1h_lt_50))
+            # 1h down move, 1h still high, 1d high
             & ((rsi_3_1h_gt_30) | (stochrsi_k_1h_lt_40) | (stochrsi_k_1d_lt_90))
             # 1h & 4h down move, 4h still high
             & ((rsi_3_1h_gt_35) | (rsi_3_4h_gt_55) | (stochrsi_k_4h_lt_50))
@@ -25515,6 +25593,8 @@ class NostalgiaForInfinityX7(IStrategy):
             & ((rsi_3_4h_gt_50) | (stochrsi_k_15m_lt_40) | (stochrsi_k_1h_lt_70))
             # 4h down move, 15m & 4h still high
             & ((rsi_3_4h_gt_50) | (stochrsi_k_15m_lt_50) | (aroonu_14_4h_lt_50))
+            # 4h down move, 15m high, 1h high, 1d overbought
+            & ((rsi_3_4h_gt_50) | (aroonu_14_15m_lt_60) | (stochrsi_k_1h_lt_70) | (roc_9_1d_lt_20))
             # 4h down move, 15m high, 4h still not low enough
             & ((rsi_3_4h_gt_50) | (stochrsi_k_15m_lt_70) | (stochrsi_k_4h_lt_30))
             # 4h down move, 1h still high, 4h high
@@ -25664,7 +25744,7 @@ class NostalgiaForInfinityX7(IStrategy):
             # 1h & 3h down move, 1d high
             & ((rsi_3_1h_gt_10) | (rsi_3_4h_gt_40) | (aroonu_14_1d_lt_80))
             # 1h & 4h down move, 4h high
-            & ((rsi_3_1h_gt_15) | rsi_3_4h_gt_20 | aroonu_14_4h_lt_70)
+            & ((rsi_3_1h_gt_15) | (rsi_3_4h_gt_40) | (aroonu_14_4h_lt_70))
             # 1h down move, 1h downtrend, 1d overbought
             & ((rsi_3_1h_gt_15) | (roc_9_1h_gt_neg_30) | (roc_9_1d_lt_80))
             # 1h & 4h down move, 1d downtrend
@@ -26320,63 +26400,160 @@ class NostalgiaForInfinityX7(IStrategy):
 
         # Condition #171 - Pump hunter (Long, experimental, RAW — ignition candle rider).
         if long_entry_condition_index == 171:
+          # Protections
           long_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
           long_entry_logic.append(protections_long_global == True)
-          # calm base: not already pumped over the rolling 24h (ride ignition, don't chase)
-          long_entry_logic.append(roc_288 < 10.0)
-          # ignition: green candle with a real body, closing in its upper half, CROSSING above
-          # the prior 48-candle high (a doji-sized "ignition" or one that closes back in the lower
-          # half of its own range has no follow-through: measured -4,693 and -4,587 respectively)
-          long_entry_logic.append(close > (open_rate * 1.002))
-          long_entry_logic.append(close > ((high_px + low_px) / 2.0))
-          long_entry_logic.append(np_shift(close, 1) <= np_shift(close_max_48, 1))
-          long_entry_logic.append(close > np_shift(close_max_48, 1))
-          # ...on explosive volume (pump signature). Unlike the dump hunter, where 3.0 is the
-          # sweet spot, the pump side loses in the 3-4x band (-5,767 over 343 trades) — the
-          # ignition needs real participation, not a routine tick up in volume
-          long_entry_logic.append(vol_rel > 4.0)
-          # do not buy an ignition while the higher timeframes are caving: the 4h RSI must not be
-          # collapsing, hourly money flow must not be drained, and the pair must not already be
-          # deep in the red over the rolling 24h (the mirror of what the dump hunter needs)
-          long_entry_logic.append(rsi_14_change_pct_4h > -15.0)
-          long_entry_logic.append(mfi_14_1h > 25.0)
-          long_entry_logic.append(roc_288 > -6.0)
-          # nor after the hourly momentum has already tripled (late chase), nor with the daily
-          # pinned at its floor, nor out of an hourly base too tight to have a move in it
-          long_entry_logic.append(rsi_3_change_pct_1h < 200.0)
-          long_entry_logic.append(rsi_3_1d > 8.0)
-          long_entry_logic.append(bbb_20_2_0_1h > 2.0)
-          # and not at the very top of the multi-day hourly range: buying an ignition there is the
-          # late chase that produced the fattest losses (WILLR_84_1h at the ceiling)
-          long_entry_logic.append(willr_84_1h < -1.9)
-          long_entry_logic.append(stochrsi_k_4h > 2.0)
-          long_entry_logic.append(ph_base_pos > 2.0)
-          # no 4h rejection wick over the ignition, 15m momentum not caving, and not pinned at the
-          # 40h extreme high (the long-side reading of the room-to-move check)
-          long_entry_logic.append(top_wick_pct_4h < 3.0)
-          long_entry_logic.append(rsi_3_change_pct_15m > -40.0)
-          # the 15m must not be in a dead zone and the 5m must not already have gone vertical
-          long_entry_logic.append(uo_7_14_28_15m > 43.0)
-          long_entry_logic.append(rsi_14_change_pct < 55.0)
-          # the hourly stochastic must not be parked at the ceiling and the 4h oscillator must not
-          # already have exploded (the long-side reading of the dump hunter's rollover check)
-          long_entry_logic.append(stochk_14_3_3_1h < 95.0)
-          long_entry_logic.append(stochrsi_k_change_pct_4h < 250.0)
-          # the ignition must actually be up on the candle, and the 5m oscillator must not be
-          # already maxed out when we buy it
-          long_entry_logic.append(change_pct > 0.22)
-          long_entry_logic.append(stochrsi_k < 100.0)
-          # nor with the rotation stochastic already maxed, the 4h momentum caved, or 15m volume
-          # flow collapsing under the ignition
-          long_entry_logic.append(quad_s93_max_12 < 100.0)
-          long_entry_logic.append(rsi_3_change_pct_4h > -50.0)
-          long_entry_logic.append(obv_change_pct_15m > -32.0)
-          # and the hourly must not be washed out underneath the ignition — together with the
-          # ceiling checks above this brackets the 1h into a band instead of an extreme
-          long_entry_logic.append(stoch_4_4 > 59.0)
-          long_entry_logic.append(willr_14_1h > -82.0)
-          long_entry_logic.append(stochrsi_k_1h > 6.0)
-          long_entry_logic.append(willr_480 < -1.4)
+
+          long_entry_logic.append(
+            # --- 5m: the ignition candle has to be a real move on a base that is not collapsing
+            (roc_2 > 0.5)
+            # the base is overbought, its 14 barely moved and the 12-candle floor is already high:
+            # a stalled push, not an ignition
+            & ((rsi_4 > 85.0) | (rsi_14_change_pct < 16.0) | (quad_s93_min_12 < 40.0))
+            & (rsi_14_change_pct < 30.0)
+            & (cmf_20 > 0.05)
+            # the base low is stale, the 4h CCI is positive and 15m money flow is rich: buying
+            # into a market that has already been bid up
+            & ((aroond_14 < 70.0) | (cci_20_4h < 0.0) | (mfi_14_15m > 65.0))
+            # no fresh 4h low, the 15m oscillator is not up and the candle itself is small:
+            # an ignition without any of its usual company
+            & ((aroond_14_4h > 0.0) | stochrsi_k_15m_gt_60 | (change_pct > 0.5))
+            & (stoch_9_3 > 80.0)
+            & (willr_14 < -5.0)
+            # price pinned at the top of its own 14-bar range, the 4h RSI already rising and
+            # 15m money flow not rich: the ignition is the last buyer, not the first
+            & ((willr_14 > -15.0) | (rsi_14_change_pct_4h < 8.0) | (cmf_20_15m > 0.15))
+            # the base ROC is not extended — unless the 15m momentum is genuinely turning up
+            & ((roc_9 < 5.0) | (rsi_3_change_pct_15m > 20.0))
+            # the ignition is not the first cross of a loose base: either the coil has crossed
+            # a few times already, or the base was tight to begin with
+            & ((ph_cross_cnt_12 < 5.0) | (ph_pre_tight < 5.0))
+            # --- 15m: the fast timeframe must confirm, not cave
+            & (rsi_3_change_pct_15m > -10.0)
+            # the 15m RSI is genuinely turning up, or the hour is hot while the 4h is not
+            & ((rsi_14_change_pct_15m > 10.0) | rsi_3_1h_gt_60 | rsi_3_4h_lt_60)
+            # 15m money flow is not pouring in, the 15m is not overheated and the 12-candle
+            # low sits high in its range: the ignition has no fuel under it
+            & ((cmf_20_15m > 0.2) | (mfi_14_15m < 80.0) | (quad_s93_min_12 < 70.0))
+            # the base RSI is not stretched, or the 15m is quiet with rich money flow
+            & ((mfi_14_15m > 65.0) | (rsi_14_change_pct < 20.0) | (change_pct_15m < 1.0))
+            # daily money flow is alive, the 15m RSI is rising, or the 15m oscillator is maxed
+            & ((mfi_14_1d > 30.0) | (rsi_14_change_pct_15m > 5.0) | stochrsi_k_15m_gt_90)
+            # no fresh 15m low, 4h direction weak and the 4h RSI already mid-band: nothing is
+            # actually leading this ignition
+            & ((aroond_14_15m < 20.0) | (minus_di_14_4h < 20.0) | rsi_14_4h_lt_50)
+            # the 15m CCI is extreme and rising while volume is only ordinary: a spike on the
+            # oscillator, not in the tape
+            & ((cci_20_15m < 250.0) | (cci_20_change_pct_15m < 225.0) | (vol_rel > 8.0))
+            # the 15m CCI is not snapping up while the day has already fallen
+            & ((cci_20_change_pct_15m < 50.0) | (change_pct_1d > -5.0))
+            & (cci_20_change_pct_15m < 500.0)
+            & (willr_14_15m > -50.0)
+            # volume is not pouring into the 15m — unless the daily candle has a real lower
+            # wick, i.e. the day was already bought once
+            & ((obv_change_pct_15m < 15.0) | (bot_wick_pct_1d > 1.0))
+            & (sqz_cnt_24 < 15.0)
+            # the 40-candle band is not wide, or the 15m RSI is genuinely strong
+            & ((bbd_40_2_0 < 15.0) | (rsi_14_15m > 60.0))
+            # --- 1h: the hour must not already have tripled its momentum
+            & (rsi_3_change_pct_1h < 100.0)
+            # hourly money flow is not rich — unless the 4h oscillator is still falling, where
+            # a rich hour is the start of the move rather than its end
+            & ((mfi_14_1h < 60.0) | (stochrsi_k_change_pct_4h > -25.0))
+            & (mfi_14_1h > 45.0)
+            # the hour has made a recent low, or the 4h CCI has not collapsed under it
+            & ((aroond_14_1h > 30.0) | (cci_20_change_pct_4h > -600.0))
+            # the 4h low is not fresh, hourly money flow is thin and the daily RSI_3 is snapping
+            # up: the higher timeframes are not behind this move
+            & ((aroond_14_4h > 20.0) | (cmf_20_1h > 0.05) | (rsi_3_change_pct_1d < 50.0))
+            & ((aroond_14_4h > 20.0) | (rsi_3_change_pct_1d < 50.0) | (vol_rel < 6.0))
+            # the hourly CCI is positive, or the 4h has not just jumped
+            & ((cci_20_1h > 50.0) | (roc_2_4h < 2.0))
+            # --- 4h: the higher timeframe must be in shape and must not have exploded
+            # the 4h RSI_3 is exploding while daily money flow is rich and the 4h sits at its
+            # low: a spike into a market that is already fully bid
+            & ((rsi_3_change_pct_4h < 100.0) | (mfi_14_1d < 70.0) | (willr_14_4h > -50.0))
+            # same spike with the base stochastic maxed and the 12-candle low already high
+            & ((rsi_3_change_pct_4h < 125.0) | (stoch_4_4 < 85.0) | (quad_s93_min_12 < 30.0))
+            & (rsi_3_change_pct_4h < 150.0)
+            & (rsi_3_change_pct_4h > -30.0)
+            # the 4h RSI is rising, the hour has already tripled its momentum, and the hourly
+            # stochastic is below mid-band: the move is late on every reading
+            & ((rsi_14_change_pct_4h < 5.0) | (rsi_3_change_pct_1h < 30.0) | (stochk_14_3_3_1h > 50.0))
+            # 15m flow thin while the 4h has already jumped and shows no rejection wick:
+            # entering an extended higher timeframe
+            & ((cmf_20_15m > 0.05) | (rsi_14_change_pct_4h < 15.0) | (top_wick_pct_4h > 1.0))
+            # 4h money flow is not deeply negative — unless the day itself has already dropped,
+            # where negative 4h flow is the wash rather than the trend
+            & ((cmf_20_4h > -0.2) | (roc_2_1d < -2.0))
+            # 4h money flow is healthy, or the day has not already run
+            & ((mfi_14_4h > 40.0) | roc_9_1d_lt_15)
+            # 4h money flow is healthy, or volume is still coming in
+            & ((mfi_14_4h > 45.0) | (obv_change_pct > -5.0))
+            # the 4h low is genuinely fresh, the day has fallen and the base ROC is up: buying
+            # a bounce inside a falling day
+            & ((aroond_14_4h > 60.0) | (roc_2_1d > -5.0) | (roc_9 > 1.0))
+            & (stochk_14_3_3_4h < 90.0)
+            & (stochrsi_k_4h < 95.0)
+            & (stochrsi_k_change_pct_4h < 180.0)
+            & (cci_20_4h < 100.0)
+            & (cci_20_4h > -100.0)
+            # the 4h CCI is not collapsing — unless volume is still coming in, or hourly money
+            # flow is not yet rich
+            & ((cci_20_change_pct_4h < 50.0) | (obv_change_pct > -10.0))
+            & ((cci_20_change_pct_4h < 50.0) | cmf_20_1h_lt_0_30)
+            # the 4h is not pinned at its low — unless the day is quiet enough for it to matter
+            & ((willr_14_4h > -60.0) | (change_pct_1d < 2.0))
+            # the 4h has turned up but on weak money flow with a flat hour: a hollow recovery
+            & ((roc_2_1h > 0.5) | (mfi_14_4h > 40.0) | cci_20_change_pct_4h_lt_0)
+            # a big 15m candle chasing a 4h that already ran, with the hour not confirming
+            & ((change_pct_15m < 1.5) | (stochk_14_3_3_1h > 60.0) | (rsi_3_4h < 65.0))
+            # the base is off its floor on a small candle while the 4h stochastic is maxed:
+            # a tired push under a ceiling
+            & ((ph_base_pos > 4.0) | (change_pct < 1.0) | stochrsi_k_4h_lt_80)
+            & (plus_di_14_4h > 15.0)
+            # 4h direction is real, or the day has not already run
+            & ((plus_di_14_4h > 20.0) | roc_9_1d_lt_15)
+            & (top_wick_pct_4h < 2.0)
+            # --- 1d: the day must not be caving underneath the ignition
+            # 15m money flow already rich, no 4h rejection wick and the day pinned at its high
+            & (cmf_20_15m_lt_0_30 | (top_wick_pct_4h < 0.5) | aroonu_14_1d_lt_100)
+            # the daily low is not fresh, or the 15m CCI has genuinely turned up
+            & ((aroond_14_1d > 0.0) | (rsi_3_15m > 80.0))
+            # price is not at the very top of its 40h range while the day is already up
+            & ((willr_480 > -15.0) | (change_pct_1d < 5.0))
+            # the ignition candle is small, the 15m ultimate oscillator is caving and the day
+            # already printed an upper wick
+            & ((roc_2 < 1.5) | (uo_7_14_28_change_pct_15m > -5.0) | (top_wick_pct_1d > 1.5))
+            & (roc_2_1d > -10.0)
+            # the base has no push left and the day is a doji-ish candle rejected on both ends
+            & ((roc_9 > 2.0) | (bot_wick_pct_1d < 4.0) | (top_wick_pct_1d < 2.0))
+            & (roc_9_1d > -30.0)
+            & (change_pct_1d > -10.0)
+            # the base is barely off its floor, the 15m is accelerating hard and the day printed
+            # a long upper wick: a spike into supply
+            & ((ph_base_pos > 3.0) | (rsi_3_change_pct_15m < 60.0) | (top_wick_pct_1d < 1.5))
+            # 4h directional strength is real, or the day has not fallen far
+            & ((plus_di_14_4h > 20.0) | (change_pct_1d > -5.0))
+          )
+
+          # Logic
+          long_entry_logic.append(
+            # calm base: not already pumped over the rolling 24h (ride the ignition, don't chase)
+            (roc_288 < 8.0)
+            # ignition: green candle with a real body, closing in its upper half, CROSSING above
+            # the prior 48-candle high (a doji-sized ignition, or one closing back in the lower
+            # half of its own range, has no follow-through: -4,693 and -4,587 respectively)
+            & (close > (open_rate * 1.002))
+            & (close > ((high_px + low_px) / 2.0))
+            & (np_shift(close, 1) <= np_shift(close_max_48, 1))
+            & (close > np_shift(close_max_48, 1))
+            # ...on explosive volume. Unlike the dump hunter, where 3.0 is the sweet spot, the
+            # pump side loses in the 3-4x band (-5,767 over 343 trades): the ignition needs real
+            # participation, not a routine tick up in volume
+            & (vol_rel > 4.0)
+          )
+
           # NOTE: the measured PUMP CHARACTER columns (PH_BASE_POS d=0.95, PH_PRE_TIGHT d=0.65,
           # PH_CROSS_CNT_12 first-fire counter) are defined above and ready for your protection
           # pass — shipped RAW per our measurements (character gates halved damage but the raw
@@ -28567,58 +28744,246 @@ class NostalgiaForInfinityX7(IStrategy):
           short_entry_logic.append(close < ib_mother_l)
         # Condition #669 - Dump hunter (Short, experimental, RAW — crash ignition, mirror of 171).
         if short_entry_condition_index == 669:
+          # Protections
           short_entry_logic.append(num_empty_288 <= allowed_empty_candles_288)
           short_entry_logic.append(protections_short_global == True)
-          # calm base: not already crashed over the rolling 24h (ride ignition, don't chase)
-          short_entry_logic.append(roc_288 > -10.0)
-          # ignition: red candle with a real body CROSSING below the prior 48-candle low...
-          # (a doji-sized "breakdown" has no follow-through: bodies under 0.3% are net negative)
-          short_entry_logic.append(close < (open_rate * 0.997))
-          short_entry_logic.append(np_shift(close, 1) >= dh_prev_min)
-          short_entry_logic.append(close < dh_prev_min)
-          # ...on explosive volume (dump signature). 3.0 is load-bearing: lowering it to 2.0 adds
-          # 95 trades and costs ~92% of the tag's profit (measured 2026-08-13)
-          short_entry_logic.append(vol_rel > 3.0)
-          # do not short a floor that is already washed out on the 4h: the worst losses entered
-          # with the 4h stochastic pinned at the bottom (PLAY -1785 at 7.11, ALCH -1159 at 5.19)
-          short_entry_logic.append(stochk_14_3_3_4h > 12.0)
-          # and do not short into a 4h that is already turning back up: the remaining losses were
-          # breakdowns sold while the higher timeframe was recovering, and they were bought back
-          # (KOMA -2725, DODOX -2051, CLANKER -1850). Three angles on the same rollover state.
-          short_entry_logic.append(stochrsi_k_change_pct_4h < 25.0)
-          short_entry_logic.append(rsi_14_change_pct_4h < 8.0)
-          short_entry_logic.append(uo_7_14_28_4h > 35.0)
-          # same rollover state one timeframe down: the 15m oscillator must not be jumping up
-          # while the 5m breaks (NAORIS -3581, G -2655, SOL -2003 all entered mid-bounce)
-          short_entry_logic.append(uo_7_14_28_change_pct_15m < 10.0)
-          # and the hourly must not have started bouncing already (replaces an earlier KST clause;
-          # measured slightly better than it and on an indicator we are not planning to drop)
-          short_entry_logic.append(roc_2_1h < 0.5)
-          # nor when the 4h has just printed a high: fading a breakdown while the higher timeframe
-          # is making new highs is fading the trend, and it is where the fat losses sit
-          # (DODOX -3314 entered at AROONU_14_4h 78.6, the 60-80 band alone is -10.9K over 126 trades)
-          short_entry_logic.append(aroonu_14_4h < 50.0)
-          # nor while hourly money flow is still at or above neutral: the buyers are still there,
-          # and every one of PLAY's worst shorts was sold into that state (MFI_14_1h 55-61)
-          short_entry_logic.append(mfi_14_1h < 50.0)
-          # same on the 4h: DODOX's remaining losses were all sold with 4h money flow still rich
-          # (MFI_14_4h 58-76 against a 49.5 winner median)
-          short_entry_logic.append(mfi_14_4h < 55.0)
-          # and there must still be room below: an RSI_3 pinned at zero means the 5m is already
-          # fully washed out (our PH_BASE_POS measurement in the core language), and a pair coming
-          # straight out of a long squeeze has no established down-leg to ride
-          short_entry_logic.append(rsi_3 > 0.4)
-          short_entry_logic.append(sqz_cnt_24 < 23.0)
-          # three angles on the same requirement — there has to be room left underneath:
-          # not pinned at the 40h extreme low, the 15m not fully washed, and a measurable
-          # distance above the rolling 24h base (our own pump-hunter column, short side)
-          short_entry_logic.append(willr_480 > -99.5)
-          short_entry_logic.append(rsi_14_15m > 17.0)
-          short_entry_logic.append(ph_base_pos > 0.03)
-          # the pre-break base must have been tight (our pump-hunter coil measure, short side) and
-          # the hourly CCI must not be snapping upward as we sell
-          short_entry_logic.append(ph_pre_tight > 0.4)
-          short_entry_logic.append(cci_20_change_pct_1h < 500.0)
+
+          short_entry_logic.append(
+            # --- 5m: no room left below, and the break candle itself
+            (rsi_3 > 0.4)
+            & (willr_480 > -99.5)
+            & (ph_base_pos > 0.03)
+            & (ph_pre_tight > 0.4)
+            & (sqz_cnt_24 < 23.0)
+            # the 5m is not really selling and the hour is flat: nothing to ride
+            & ((rsi_3 < 15.0) | (roc_9_1h < -0.25))
+            # the base RSI is not low, the 4-period RSI is not washed and the base stochastic is
+            # off zero: the fast timeframe has nothing left to give (3 losses, free everywhere)
+            & ((rsi_14 > 25.0) | (rsi_4 < 10.0) | (stochrsi_k > 0.0))
+            # no high anywhere on the base or 15m, the day is falling and not overbought: the
+            # market is already down and there is nothing left to break (5 losses)
+            & ((aroonu_14 > 0.0) | (roc_9_1d > 0.0) | (rsi_14_1d < 55.0))
+            # a high already printed on the base timeframe, 4h directional strength positive, the
+            # pair not far down over the day and the daily oscillator elevated: shorting into a
+            # market that is holding up on every reading (4 losses, free in all three years)
+            & ((plus_di_14_4h > 12.0) | (roc_288 > -7.0) | stochrsi_k_1d_lt_60)
+            # the base ROC still falling while the 15m momentum holds up, the hourly oscillator
+            # is mid-band and price sits high in the hour's range: no leg underneath (5 losses)
+            & ((rsi_3_change_pct_15m > -50.0) | stochrsi_k_1h_lt_60 | (willr_14_1h > -75.0))
+            # volume leaving on the 15m while the hour has just printed a high (BERA -2,049;
+            # 0W/1L | 0W/2L | 0W/1L)
+            & ((obv_change_pct > -15.0) | aroonu_14_1h_gt_20 | (uo_7_14_28_change_pct_15m < -10.0))
+            # a wide, choppy pre-break hour on a pair that has not really fallen over the day and
+            # whose 15m is already pinned at its floor: the "break" is just another swing inside
+            # the range with no room left under it (SAND -5,934 + others)
+            & ((ph_pre_tight < 5.0) | (roc_9_4h > -3.0) | (willr_14_15m > -95.0))
+            # a tight pre-break hour blown apart by a volume spike: the move is the spike itself
+            & ((ph_pre_tight > 0.8) | (vol_rel < 10.0))
+            # the 15m is already deep in its own range while its oscillator holds up: no leg left
+            # to sell (INJ -1,844; 0W/1L | 0W/0L | 0W/1L)
+            & ((quad_s93_min_12 < 15.0) | (uo_7_14_28_15m > 35.0) | (rsi_14_15m < 25.0))
+            # a bearish engulfing while the DAILY is making highs and strong is a pullback inside
+            # an uptrend, not a breakdown. In the 2021 bull the blocked group averages -7.2%
+            # against a +0.2% population; in 2026/2022 it touches three trades in total
+            & ((engulf_bear < 0.5) | aroonu_14_1d_lt_70 | rsi_14_1d_lt_60)
+            # --- 15m: the fast timeframe has to confirm the break
+            & (rsi_14_15m > 17.0)
+            & (uo_7_14_28_change_pct_15m < 10.0)
+            # 15m money flow already negative, the day flat and the 15m RSI_3 collapsing on a
+            # day that has not fallen: a spike being sold into a stable market (3 losses)
+            & ((cmf_20_15m > -0.2) | (roc_2_1d < 2.0) | (change_pct_1d > -2.0))
+            # no fresh 15m low, base and 15m money flow both drained, and the 12-candle high sits
+            # near the top of its range: sold out into a market that just topped (5 losses)
+            & ((mfi_14 < 35.0) | (mfi_14_15m < 30.0) | (quad_s93_max_12 > 60.0))
+            # no fresh 15m low while the 4h low is recent, hourly CCI already recovering and the
+            # 15m RSI not low: the 15m has finished its leg (4 losses, free in all three years)
+            & (aroond_14_15m_lt_80 | (cci_20_1h > -175.0) | rsi_14_15m_lt_35)
+            # the 15m has dropped but its RSI is not low, price is pinned at the 15m floor and
+            # the hour is flat: the move already happened on the fast timeframe (5 losses)
+            & ((roc_9_15m < -2.5) | (willr_14_15m < -75.0) | (change_pct_1h > -1.5))
+            # 15m money flow still rich while the hour is red and the 4h has already dropped:
+            # buyers are underneath the break (6 losses, all in 2022)
+            & ((mfi_14_15m > 35.0) | rsi_3_4h_gt_10 | (change_pct_1h < 0.0))
+            # the 15m momentum has already collapsed and volume is coming back in: the flush is
+            # over (SOL -2,739; 0W/0L | 0W/0L | 1W/3L)
+            & ((cci_20_change_pct_15m > -850.0) | (willr_14_15m > -95.0) | (obv_change_pct_15m > 1.0))
+            # the 15m has already been sold off hard and the base oscillator has not confirmed
+            # (SAND 2021 -822,676; 0W/0L | 1W/1L | 0W/1L)
+            & ((cci_20_change_pct_15m > -1200.0) | rsi_14_15m_lt_40 | (aroond_14_15m < 100.0))
+            # 15m CCI already turning up while the hourly is still falling, hourly RSI low and
+            # the day barely down: a bounce forming under a tired hour (5 losses)
+            & ((cci_20_change_pct_1h < 50.0) | (rsi_14_1h < 45.0) | (change_pct_1d > -2.0))
+            # a dead 15m oscillator under a huge volume spike = climax, not a leg down
+            & ((uo_7_14_28_15m > 30.0) | (vol_rel < 10.0))
+            # volume leaving on the 15m while the day is dropping hard, the base RSI is low and
+            # the 15m oscillator is off its floor: selling the end of a move (5 losses)
+            & ((obv_change_pct_15m > 0.0) | (rsi_20 < 35.0) | stochrsi_k_15m_gt_20)
+            # --- 1h: the hour must not already be turning back up
+            & (roc_2_1h < 0.5)
+            & (mfi_14_1h < 50.0)
+            & (cci_20_change_pct_1h < 500.0)
+            # a 15m stuck at its low that has not made a new low, entered from above the 24h base
+            # (RUNE -29,002; 0W/1L | 2W/1L | 3W/2L)
+            & (rsi_3_1h_lt_55 | (aroond_14_15m < 100.0) | (ph_base_pos < 0.5))
+            # hourly RSI_3 snapping up on a falling candle with 15m money flow still neutral
+            # (BTC -23,817; 0W/1L | 1W/1L | 0W/0L)
+            & ((rsi_3_change_pct_1h < 740.0) | (roc_2 < -1.5) | (cmf_20_15m > -0.05))
+            # hourly oversold while price is nowhere near its 40h low: the sell-off is paid for
+            # and what is left is the bounce (EIGEN -6,312, BERA -6,235)
+            & ((rsi_14_1h > 40.0) | (willr_480 < -85.0))
+            # high-volume break into an hour that has already recovered = squeeze fuel
+            # (NAORIS -5,028, ARB -4,918, SAND -4,261)
+            & (rsi_14_1h_lt_40 | (vol_rel < 6.0) | (mfi_14_1h < 30.0))
+            # hourly RSI mid-range while the 4h momentum has collapsed but the 15m has not
+            # confirmed: the fast timeframe is not selling (UNI -10,291; 2W/0L | 2W/0L | 0W/1L)
+            & (rsi_14_1h_lt_50 | (rsi_3_change_pct_4h > -30.0) | (rsi_3_change_pct_15m < -60.0))
+            # 5m selling stalled and the 15m oscillator snapping back up under the break (XMR
+            # -2,340; 0W/1L | 0W/1L | 0W/1L)
+            & ((cmf_20_1h > -0.25) | (rsi_3_change_pct_15m > -70.0) | (stochrsi_k_change_pct_4h > -40.0))
+            # hourly money flow still neutral while the hour is no longer falling and the 5m is
+            # not washed: nothing is actually selling (3 losses, free in all three years)
+            & ((cmf_20_1h > -0.05) | (roc_9_1h < 0.0) | rsi_3_gt_5)
+            # the hour is not falling, its RSI is mid-range, the daily candle has a long lower
+            # wick and the 4h is flat: a market being bought on every dip (5 losses)
+            & ((roc_9_1h < -1.0) | (bot_wick_pct_1d < 4.0) | (change_pct_4h > -1.5))
+            # hourly money flow drained while price sits high in its own range = exhausted seller
+            & ((mfi_14_1h > 20.0) | (willr_14_1h < -75.0))
+            # hourly money flow drained, 4h already down hard, and the base timeframe printing a
+            # high (SOON -2,118; 2W/1L | 2W/3L | 3W/3L)
+            & ((mfi_14_1h > 10.0) | (roc_9_4h > -4.0) | (aroonu_14 > 30.0))
+            # the 15m stochastic pinned at zero with hourly money flow drained and the 15m no
+            # longer falling: the flush already happened (6 losses, mostly 2021)
+            & ((mfi_14_1h > 25.0) | (roc_9_15m > -3.0) | (stochrsi_k_15m > 0.0))
+            # hourly CCI collapsing while volume comes back in and the daily sits high in its own
+            # range: squeeze fuel on a strong day (6 losses across all three years)
+            & ((cci_20_1h > -200.0) | (obv_change_pct > 0.0) | (willr_14_1d > -60.0))
+            # hourly CCI collapsing into a base oscillator that is already low, on a 4h that has
+            # not made a recent low (DOT -26,460; 0W/0L | 0W/1L | 0W/0L)
+            & ((cci_20_change_pct_1h > -475.0) | (stochrsi_k < 40.0) | (aroond_14_4h < 60.0))
+            # hourly CCI snapping up, daily money flow rich, the 15m oscillator above mid-band
+            # and price at the 15m floor: buyers already stepped in (5 losses)
+            & ((cci_20_change_pct_1h < 75.0) | (mfi_14_1d < 60.0) | (willr_14_15m < -75.0))
+            # hourly CCI already recovering, the daily RSI_3 snapping up and price nowhere near
+            # its 40h low: the hour has turned and there is room above, not below (3 losses)
+            & ((cci_20_change_pct_1h > -25.0) | (rsi_3_change_pct_1d < 75.0) | (willr_480 > -90.0))
+            # --- 4h: the higher timeframe carries the move — it must not be washed out or
+            & (rsi_14_change_pct_4h < 8.0)
+            # 4h: just printed a high, or money flow still rich (DODOX -3314 at AROONU_14_4h 78.6)
+            & aroonu_14_4h_lt_50
+            # 4h: turning back up under the break (KOMA -2725, DODOX -2051, CLANKER -1850)
+            & (stochrsi_k_change_pct_4h < 25.0)
+            # recovering. Floor already washed out (PLAY -1785 at 7.11, ALCH -1159 at 5.19)
+            & (stochk_14_3_3_4h > 12.0)
+            & (mfi_14_4h < 55.0)
+            & (uo_7_14_28_4h > 35.0)
+            # the 15m selling is spent while the 4h RSI is nowhere near washed (ADA -20,094)
+            & (rsi_14_4h_gt_20 | (cci_20_change_pct_15m < 100.0) | rsi_3_15m_gt_20)
+            # 4h strong with clearly positive 4h money flow: that is shorting a healthy uptrend
+            # (ARPA -6,334 + 1 more; the only one of the late chains that also pays in 2022)
+            & (rsi_14_4h_lt_50 | cmf_20_4h_lt_0_15)
+            # the hourly turning up hard while price sits high in its 84-candle range: the 4h RSI
+            # is rising as we sell (APR -14,372, our largest 2026 loss; 2W/1L | 1W/2L | 0W/1L)
+            & ((rsi_14_change_pct_4h < 6.0) | stochrsi_k_1h_lt_60 | (willr_84_1h < -70.0))
+            # 4h money flow negative with the base money flow at zero, a squeeze behind it and a
+            # daily candle with no upper wick: the down-move is spent (3 losses, free everywhere)
+            & ((mfi_14 > 5.0) | (sqz_cnt_24 > 4.0) | (top_wick_pct_1d < 1.5))
+            # 4h money flow clearly positive while the 4h is pinned at its low = accumulation at
+            # the bottom, not a breakdown (AVAX -6,879; 1W/1L | 0W/2L | 1W/1L)
+            & (cmf_20_4h_lt_0_15 | (willr_14_4h > -90.0) | (rsi_3_change_pct_4h > -40.0))
+            # no 4h high behind it, 4h CCI still climbing, directional strength weak and the base
+            # RSI already low: selling a market with no down-leg to give
+            & ((cci_20_change_pct_4h < 200.0) | (plus_di_14_4h < 18.0) | (rsi_20 < 35.0))
+            # 4h already recovering off a pair that has fallen hard over the day, while the 4h
+            # itself is no longer in a live down-leg
+            & (aroonu_14_4h_lt_30 | (roc_288 > -7.0) | (cci_20_4h < -125.0))
+            # 4h and 1h both printing highs while the 15m RSI is not falling (LINK -20,140;
+            # 1W/0L | 1W/1L | 0W/2L)
+            & (aroonu_14_4h_lt_40 | aroonu_14_1h_lt_70 | (rsi_14_change_pct_15m > -10.0))
+            # 4h at its 14-period low and the 5m selling already stopped
+            # (PLAY -16,653 on 2026-07-04: AROOND_14_4h 100 with RSI_3 20.8)
+            & ((aroond_14_4h < 100.0) | (rsi_3 < 15.0))
+            # the low printed on BOTH 4h and 15m right now, money flow above neutral
+            # (CLANKER -4,785 on 2026-04-29)
+            & ((aroond_14_4h < 100.0) | (aroond_14_15m < 100.0) | (mfi_14_1h < 40.0))
+            # 4h near its low, its oscillator back up, hourly off its own low
+            # (NAORIS -5,539 on 2026-04-18: AROOND_14_4h 85.7, STOCHRSIk_4h 92.0, WILLR_14_1h -70.2)
+            & (aroond_14_4h_lt_80 | stochrsi_k_4h_lt_40 | (willr_14_1h < -85.0))
+            # 4h near its low while the 1h has just printed a high and its oscillator is above
+            # mid-band: the leg down is finished (AVAX -16,736; thresholds picked on 2026+2022)
+            & (aroond_14_4h_lt_80 | aroonu_14_1h_lt_40 | (uo_7_14_28_1h < 50.0))
+            # a fully washed 4h on a pair whose DAILY has just printed a high: that is a dip inside
+            # a strong uptrend, not a breakdown. Blocked trades average -3.5% in the 2021 bull and
+            # +1.4% in 2026 (well under the tag average), so it costs nothing and saves the bull
+            & (stochrsi_k_4h_gt_10 | aroonu_14_1d_lt_85)
+            # the 4h oscillator has stopped falling, the 4h low is not fresh, and the hourly
+            # oscillator is already at the floor (SOL 2021 -815,130; 1W/0L | 3W/0L | 0W/4L)
+            & ((stochrsi_k_change_pct_4h < 10.0) | (aroond_14_4h > 20.0) | stochrsi_k_1h_lt_30)
+            # the day has not really fallen while both the 5m and the hourly RSI_3 are washed and
+            # the 4h sits at its low: everything is oversold except the day (5 losses)
+            & ((roc_2_1d > -10.0) | (rsi_3 < 10.0) | (willr_14_4h < -80.0))
+            # the 4h has already fallen more than 6%, its RSI is not washed, the hour is pinned
+            # at its low and flat: the drop is finished (4 losses, all in 2022)
+            & ((roc_9_4h < -6.0) | (rsi_14_4h > 25.0) | (willr_14_1h < -80.0))
+            # the daily has fallen and its 2-period ROC is bouncing while 4h money flow holds up
+            # (BTC 2021 -873,230; 1W/0L | 1W/0L | 1W/2L)
+            & ((mfi_14_4h > 15.0) | (change_pct_1d < -2.0) | (roc_2_1d > -4.0))
+            # 4h CCI collapsing into a washed 4h RSI_3 with the 4h stochastic still elevated:
+            # the down-leg is spent (APR -2,531; 0W/1L | 0W/1L | 0W/1L)
+            & ((cci_20_change_pct_4h > -600.0) | rsi_3_4h_gt_10 | (stochk_14_3_3_4h < 35.0))
+            # a bounce day on weak daily money flow, 4h CCI already falling, and the 5m fully
+            # spent: nothing left to sell (7 losses in 2026|2022|2021, 1 protected winner)
+            & ((cci_20_change_pct_4h > 0.0) | (mfi_14_1d > 40.0) | (roc_9_1d < 5.0))
+            # 4h momentum has not turned over on any reading — CCI still rising, neither the 15m
+            # nor the 4h RSI falling, and the 4h oscillator above mid-band
+            & ((cci_20_change_pct_4h < 200.0) | (rsi_14_change_pct_4h > -18.0) | stochrsi_k_4h_lt_60)
+            # selling into a 4h that has already dropped hard while the base stochastic is not
+            # washed (APR -4,592; 0W/0L | 1W/3L | 1W/0L)
+            & ((change_pct_4h > -7.0) | (stoch_9_3 < 15.0) | (rsi_3_change_pct_15m < -60.0))
+            # a trending 4h under a daily that is neither weak nor washed, out of a long squeeze:
+            # shorting strength (6 losses in 2026 and 2022)
+            & ((adx_14_4h > 15.0) | rsi_14_1d_gt_40 | (stochk_14_3_3_1d > 20.0))
+            # --- 1d: the day must not be strong underneath the break
+            # a bounce day on weak daily money flow with the 4h momentum not confirming — unless
+            # the hour itself is genuinely falling right now. The fifth clause is what makes this
+            # free: with four it cut $16,530 of 2026 winners, with five it blocks 8 losses across
+            # the three years and not one protected winner (blocked group averages -24% / -18% /
+            # -34% against positive populations)
+            & ((cmf_20_1d > -0.05) | (roc_9_1d < 5.0) | rsi_14_1d_gt_50)
+            # the daily low is not fresh, the daily 5m proxy is snapping up, a long squeeze sits
+            # behind it and the 4h candle has no upper wick: a coiled market about to expand up
+            & ((aroond_14_1d > 25.0) | (rsi_3_change_pct_1d < 50.0) | (top_wick_pct_4h < 0.25))
+            # the daily low is fresh, 4h directional strength is positive, the hour is falling and
+            # price is far off its 40h low: a live daily down-leg we are late to (4 losses, and it
+            # costs nothing in any of the three years)
+            & ((plus_di_14_4h > 12.0) | (roc_9_1h < 0.0) | (willr_480 > -85.0))
+            # daily still rising, no long squeeze behind it, 4h money flow not negative
+            # (AVAX 2021 -846,246; 0W/0L | 1W/2L | 0W/0L)
+            & ((roc_2_1d < 8.0) | (sqz_cnt_24 < 10.0) | (cmf_20_4h > -0.05))
+            # daily down hard, 4h pinned at its low, price above the 24h base: the low is in
+            # (AVAX -20,591; 0W/0L | 1W/1L | 0W/2L)
+            & ((roc_9_1d > -30.0) | (willr_14_4h > -90.0) | (ph_base_pos > 0.5))
+            # daily money flow washed out on a pair that has actually fallen over the day, while
+            # the 15m has still printed a recent high = capitulation, and shorting there is
+            # shorting into the bounce
+            & ((mfi_14_1d > 20.0) | (roc_288 > -4.5) | (aroonu_14_15m < 5.0))
+            # daily money flow washed on a 4h that has already dropped, with the hourly RSI
+            # turning back up (OP -1,943; 2W/2L | 0W/2L | 0W/0L)
+            & ((mfi_14_1d > 20.0) | (change_pct_4h > -2.5) | (rsi_14_change_pct_1h < -15.0))
+          )
+
+          # Logic
+          short_entry_logic.append(
+            # calm base: not already crashed over the rolling 24h (ride the ignition, don't chase)
+            (roc_288 > -10.0)
+            # ignition: red candle with a real body (a doji-sized "breakdown" has no follow-through:
+            # bodies under 0.3% are net negative) CROSSING below the prior 48-candle low...
+            & (close < (open_rate * 0.997))
+            & (np_shift(close, 1) >= dh_prev_min)
+            & (close < dh_prev_min)
+            # ...on explosive volume. 3.0 is load-bearing: at 2.0 the tag takes 95 more trades and
+            # loses ~92% of its profit (measured 2026-08-13)
+            & (vol_rel > 3.0)
+          )
 
         # Condition #670 - Marubozu momentum (Short, experimental, RAW — mirror).
         if short_entry_condition_index == 670:
@@ -50410,6 +50775,14 @@ class NostalgiaForInfinityX7(IStrategy):
         else:
           return -ft_sell_amount
 
+    gd5_liquidation_rescue_eligible = (
+      is_futures
+      and (slice_profit_entry < -0.12)
+      and (trade.liquidation_price is not None)
+      and (current_rate < trade.liquidation_price * 1.20)
+      and (trade.get_custom_data(key="gd5_liquidation_rescue_used") is None)
+    )
+
     # Grinding 5
     # Buy
     if has_order_tags and (not partial_sell) and (grind_5_sub_grind_count < grind_5_max_sub_grinds):
@@ -50427,9 +50800,12 @@ class NostalgiaForInfinityX7(IStrategy):
           or slice_profit_lt_neg_0_06
         )
         # and ((num_open_grinds == 0) or (slice_profit < -0.03))
-        and is_long_grind_entry
+        and (is_long_grind_entry or gd5_liquidation_rescue_eligible)
         and is_not_trade_max_stake
       ):
+        if gd5_liquidation_rescue_eligible:
+          trade.set_custom_data(key="gd5_liquidation_rescue_used", value=True)
+
         buy_amount = slice_amount * grind_5_stakes[grind_5_sub_grind_count] / stake_scale_leverage
         if buy_amount < (min_stake * 1.5):
           buy_amount = min_stake * 1.5
@@ -74078,6 +74454,14 @@ class NostalgiaForInfinityX7(IStrategy):
         else:
           return -ft_sell_amount
 
+    gd5_liquidation_rescue_eligible = (
+      is_futures
+      and (slice_profit_entry > 0.12)
+      and (trade.liquidation_price is not None)
+      and (current_rate > trade.liquidation_price * 0.80)
+      and (trade.get_custom_data(key="gd5_liquidation_rescue_used") is None)
+    )
+
     # Grinding 5
     # Buy
     if has_order_tags and (not partial_sell) and (grind_5_sub_grind_count < grind_5_max_sub_grinds):
@@ -74093,9 +74477,12 @@ class NostalgiaForInfinityX7(IStrategy):
           num_open_grinds_eq_0 or (grind_order_age_time > last_filled_order.order_filled_utc) or slice_profit_gt_0_06
         )
         # and ((num_open_grinds == 0) or (slice_profit > 0.03))
-        and is_short_grind_entry
+        and (is_short_grind_entry or gd5_liquidation_rescue_eligible)
         and is_not_trade_max_stake
       ):
+        if gd5_liquidation_rescue_eligible:
+          trade.set_custom_data(key="gd5_liquidation_rescue_used", value=True)
+
         buy_amount = slice_amount * grind_5_stakes[grind_5_sub_grind_count] / stake_scale_leverage
         if buy_amount < (min_stake * 1.5):
           buy_amount = min_stake * 1.5
