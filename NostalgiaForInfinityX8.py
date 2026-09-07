@@ -71,7 +71,7 @@ class NostalgiaForInfinityX8(IStrategy):
   INTERFACE_VERSION = 3
 
   def version(self) -> str:
-    return "v18.0.1"
+    return "v18.0.6"
 
   stoploss = -0.99
 
@@ -234,6 +234,7 @@ class NostalgiaForInfinityX8(IStrategy):
     + short_high_profit_mode_tags
     + short_rapid_mode_tags
     + short_grind_mode_tags
+    + short_top_coins_mode_tags
     + short_scalp_mode_tags
   )
 
@@ -1869,6 +1870,7 @@ class NostalgiaForInfinityX8(IStrategy):
     short_rebuy_mode_tags = self.short_rebuy_mode_tags
     short_high_profit_mode_tags = self.short_high_profit_mode_tags
     short_rapid_mode_tags = self.short_rapid_mode_tags
+    short_top_coins_mode_tags = self.short_top_coins_mode_tags
     short_scalp_mode_tags = self.short_scalp_mode_tags
     short_scalp_rebuy_grind_mode_tags = self.short_scalp_rebuy_grind_mode_tags
     short_exit_known_mode_tags = self.short_exit_known_mode_tags
@@ -2292,6 +2294,29 @@ class NostalgiaForInfinityX8(IStrategy):
         profit_init_ratio,
         max_profit,
         max_loss,
+        filled_entries,
+        filled_exits,
+        last_candle,
+        previous_candle_1,
+        trade,
+        current_time,
+        enter_tags,
+      )
+      if sell and (signal_name is not None):
+        return f"{signal_name} ( {enter_tag})"
+
+    # Short Top Coins mode
+    if any(c in short_top_coins_mode_tags for c in enter_tags):
+      sell, signal_name = self.short_exit_top_coins(
+        pair,
+        current_rate,
+        profit_stake,
+        profit_ratio,
+        profit_current_stake_ratio,
+        profit_init_ratio,
+        max_profit,
+        max_loss,
+        filled_orders,
         filled_entries,
         filled_exits,
         last_candle,
@@ -3364,6 +3389,10 @@ class NostalgiaForInfinityX8(IStrategy):
     # MOMENTUM
     # =========================================================================
     ema_12 = ta_ema(close_np, timeperiod=12)
+    sma_200 = ta_sma(close_np, timeperiod=200)
+    # SMA_200 below where it was 6 candles back = the slow trend is rolling over.
+    sma_200_dec_6 = sma_200 < self.np_shift(sma_200, 6)
+    sma_200_inc_6 = sma_200 > self.np_shift(sma_200, 6)
     ema_50 = ta_ema(close_np, timeperiod=50)
     ema_100 = ta_ema(close_np, timeperiod=100)
     ema_200 = ta_ema(close_np, timeperiod=200)
@@ -3431,6 +3460,8 @@ class NostalgiaForInfinityX8(IStrategy):
         "EMA_50": ema_50,
         "EMA_100": ema_100,
         "EMA_200": ema_200,
+        "SMA_200_dec_6": sma_200_dec_6,
+        "SMA_200_inc_6": sma_200_inc_6,
         "WILLR_14": willr_14,
         "UO_7_14_28": uo,
         "ROC_2": roc_2,
@@ -3574,6 +3605,10 @@ class NostalgiaForInfinityX8(IStrategy):
     ema_12 = ta_ema(close_np, timeperiod=12)
     ema_200 = ta_ema(close_np, timeperiod=200)
     sma_16 = ta_sma(close_np, timeperiod=16)
+    sma_200 = ta_sma(close_np, timeperiod=200)
+    # SMA_200 below where it was 12 candles back = the slow trend is rolling over.
+    sma_200_dec_12 = sma_200 < self.np_shift(sma_200, 12)
+    sma_200_inc_12 = sma_200 > self.np_shift(sma_200, 12)
     willr_14 = ta_willr(high_np, low_np, close_np, timeperiod=14)
     willr_84 = ta_willr(high_np, low_np, close_np, timeperiod=84)
     uo = ta.ULTOSC(high_np, low_np, close_np)
@@ -3612,6 +3647,8 @@ class NostalgiaForInfinityX8(IStrategy):
         "RSI_14_change_pct": rsi_14_change,
         "EMA_12": ema_12,
         "EMA_200": ema_200,
+        "SMA_200_dec_12": sma_200_dec_12,
+        "SMA_200_inc_12": sma_200_inc_12,
         "SMA_16": sma_16,
         "BBL_20_2.0": bb_lower,
         "BBU_20_2.0": bb_upper,
@@ -3938,6 +3975,9 @@ class NostalgiaForInfinityX8(IStrategy):
     sma_21 = ta_sma(close_np, timeperiod=21)
     sma_30 = ta_sma(close_np, timeperiod=30)
     sma_200 = ta_sma(close_np, timeperiod=200)
+    # SMA_200 below where it was 24 candles back = the slow trend is rolling over.
+    sma_200_dec_24 = sma_200 < np_shift(sma_200, 24)
+    sma_200_inc_24 = sma_200 > np_shift(sma_200, 24)
     willr_14 = ta_willr(high_np, low_np, close_np, timeperiod=14)
     willr_480 = ta_willr(high_np, low_np, close_np, timeperiod=480)
     roc_2 = ta_roc(close_np, timeperiod=2)
@@ -4214,6 +4254,8 @@ class NostalgiaForInfinityX8(IStrategy):
         "SMA_21": sma_21,
         "SMA_30": sma_30,
         "SMA_200": sma_200,
+        "SMA_200_dec_24": sma_200_dec_24,
+        "SMA_200_inc_24": sma_200_inc_24,
         "BBL_20_2.0": bb_lower_20,
         "BBU_20_2.0": bb_upper_20,
         "BBB_20_2.0": ((bb_upper_20 - bb_lower_20) / bb_middle_20_safe) * 100.0,
@@ -12673,6 +12715,8 @@ class NostalgiaForInfinityX8(IStrategy):
             & ((rsi_3_15m_gt_10) | (aroonu_14_4h_lt_100) | (roc_9_1h_lt_10))
             # 15m & 1h down move, 4h high
             & ((rsi_3_15m_gt_15) | (rsi_3_1h_gt_15) | (aroonu_14_4h_lt_70))
+            # 15m & 1h down move, 4h high & overbought
+            & ((rsi_3_15m_gt_15) | (rsi_3_1h_gt_40) | (rsi_14_4h_lt_70) | (aroonu_14_4h_lt_90) | (roc_9_4h_lt_30))
             # 15m down move, 1h & 4h high
             & ((rsi_3_15m_gt_15) | (aroonu_14_1h_lt_70) | (stochrsi_k_4h_lt_90))
             # 15m down move, 4h high, 1d overbought
@@ -14338,6 +14382,8 @@ class NostalgiaForInfinityX8(IStrategy):
             & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_25) | (rsi_3_4h_gt_35) | (aroonu_14_4h_lt_50) | (roc_9_4h_gt_neg_10))
             # 15m & 1h down move, 1h high
             & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_25) | (aroonu_14_1h_lt_70))
+            # 15m & 1h down move, 15m still not low enough, 1h still high
+            & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_25) | (stochrsi_k_15m_lt_20) | (stochrsi_k_1h_lt_50))
             # 15m & 1h & 4h down move, 15m still not low enough, 4h high
             & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_30) | (rsi_3_4h_gt_60) | (aroonu_14_15m_lt_30) | (aroonu_14_4h_lt_70))
             # 15m & 1h down move, 1d overbought
@@ -15090,6 +15136,8 @@ class NostalgiaForInfinityX8(IStrategy):
             & ((rsi_3_1h_gt_60) | (stochrsi_k_1h_lt_60) | (stochrsi_k_1d_lt_90) | (roc_9_1d_lt_80))
             # 1h down move, 1d downtrend, 1h high, 4h high
             & ((rsi_3_1h_gt_65) | (cmf_20_1d_gt_neg_0_10) | (aroonu_14_1h_lt_90) | (stochrsi_k_4h_lt_90))
+            # 1h down move, 1d downtrend, 1h high, 4h high
+            & ((rsi_3_1h_gt_65) | (cmf_20_1d_gt_neg_0_20) | (aroonu_14_1h_lt_80) | (aroonu_14_4h_lt_100))
             # 1h down move, 1h high, 4h high
             & ((rsi_3_1h_gt_65) | (aroonu_14_1h_lt_100) | (stochrsi_k_4h_lt_90))
             # 1h down move, 1h & 4h overbought
@@ -19199,6 +19247,8 @@ class NostalgiaForInfinityX8(IStrategy):
             & ((rsi_3_15m_gt_20) | (aroonu_14_1d_lt_100) | (roc_9_4h_lt_30))
             # 15m down move, 1h high & overbought
             & ((rsi_3_15m_gt_20) | (stochrsi_k_1h_lt_80) | (roc_9_1h_lt_10))
+            # 15m & 1h down move, 1h still high, 4h high & overbought
+            & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_30) | (aroonu_14_1h_lt_50) | (aroonu_14_4h_lt_90) | (roc_9_4h_lt_10))
             # 15m & 1h down move, 15m still high, 4h high
             & ((rsi_3_15m_gt_25) | (rsi_3_1h_gt_45) | (rsi_14_15m_lt_40) | (aroonu_14_4h_lt_100))
             # 15m & 1h & 4h down move, 1h high
@@ -25397,6 +25447,49 @@ class NostalgiaForInfinityX8(IStrategy):
     current_time: "datetime",
     buy_tag,
   ) -> tuple:
+    last_stochrsi_k = last_candle["STOCHRSIk_14_14_3_3"]
+    last_willr_480 = last_candle["WILLR_480"]
+    last_aroonu_14_4h = last_candle["AROONU_14_4h"]
+
+    if 0.01 > current_profit >= 0.001:
+      if (last_stochrsi_k > 95.0) and (last_willr_480 > -1.0) and (last_aroonu_14_4h > 95.0):
+        return True, f"exit_{mode_name}_w_0_1"
+    elif 0.02 > current_profit >= 0.01:
+      if (last_stochrsi_k > 95.0) and (last_willr_480 > -1.0) and (last_aroonu_14_4h > 95.0):
+        return True, f"exit_{mode_name}_w_1_1"
+    elif 0.03 > current_profit >= 0.02:
+      if (last_stochrsi_k > 95.0) and (last_willr_480 > -1.0) and (last_aroonu_14_4h > 95.0):
+        return True, f"exit_{mode_name}_w_2_1"
+    elif 0.04 > current_profit >= 0.03:
+      if (last_stochrsi_k > 95.0) and (last_willr_480 > -1.0) and (last_aroonu_14_4h > 95.0):
+        return True, f"exit_{mode_name}_w_3_1"
+    elif 0.05 > current_profit >= 0.04:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -1.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_4_1"
+    elif 0.06 > current_profit >= 0.05:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_5_1"
+    elif 0.07 > current_profit >= 0.06:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_6_1"
+    elif 0.08 > current_profit >= 0.07:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_7_1"
+    elif 0.09 > current_profit >= 0.08:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_8_1"
+    elif 0.1 > current_profit >= 0.09:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_9_1"
+    elif 0.12 > current_profit >= 0.1:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_10_1"
+    elif 0.2 > current_profit >= 0.12:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_11_1"
+    elif current_profit >= 0.2:
+      if (last_stochrsi_k > 90.0) and (last_willr_480 > -10.0) and (last_aroonu_14_4h > 90.0):
+        return True, f"exit_{mode_name}_w_12_1"
 
     #  Here ends exit signal conditions for long_exit_williams_r
 
@@ -25416,6 +25509,75 @@ class NostalgiaForInfinityX8(IStrategy):
     current_time: "datetime",
     buy_tag,
   ) -> tuple:
+    last_sma_200_dec = last_candle["SMA_200_dec_24"]
+    last_rsi_14 = last_candle["RSI_14"]
+    last_stochrsi_k = last_candle["STOCHRSIk_14_14_3_3"]
+    last_aroonu_14 = last_candle["AROONU_14"]
+    last_willr_480 = last_candle["WILLR_480"]
+    last_aroonu_14_4h = last_candle["AROONU_14_4h"]
+    last_sma_200_dec_1h = last_candle["SMA_200_dec_12_1h"]
+    last_sma_200_dec_4h = last_candle["SMA_200_dec_6_4h"]
+
+    if 0.01 > current_profit >= 0.001:
+      if (
+        last_sma_200_dec
+        and last_sma_200_dec_1h
+        and last_sma_200_dec_4h
+        and (last_rsi_14 > 82.0)
+        and (last_stochrsi_k > 95.0)
+        and (last_aroonu_14 > 95.0)
+      ):
+        return True, f"exit_{mode_name}_d_0_1"
+    elif 0.02 > current_profit >= 0.01:
+      if (
+        last_sma_200_dec
+        and last_sma_200_dec_1h
+        and last_sma_200_dec_4h
+        and (last_rsi_14 > 80.0)
+        and (last_stochrsi_k > 95.0)
+        and (last_aroonu_14 > 95.0)
+      ):
+        return True, f"exit_{mode_name}_d_1_1"
+    elif 0.03 > current_profit >= 0.02:
+      if (
+        last_sma_200_dec
+        and last_sma_200_dec_1h
+        and last_sma_200_dec_4h
+        and (last_rsi_14 > 78.0)
+        and (last_stochrsi_k > 95.0)
+        and (last_aroonu_14 > 95.0)
+      ):
+        return True, f"exit_{mode_name}_d_2_1"
+    elif 0.04 > current_profit >= 0.03:
+      if last_sma_200_dec and (last_rsi_14 > 76.0) and (last_stochrsi_k > 95.0) and (last_aroonu_14 > 90.0):
+        return True, f"exit_{mode_name}_d_3_1"
+    elif 0.05 > current_profit >= 0.04:
+      if last_sma_200_dec and (last_rsi_14 > 74.0) and (last_stochrsi_k > 92.0) and (last_aroonu_14 > 90.0):
+        return True, f"exit_{mode_name}_d_4_1"
+    elif 0.06 > current_profit >= 0.05:
+      if last_sma_200_dec and (last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0):
+        return True, f"exit_{mode_name}_d_5_1"
+    elif 0.07 > current_profit >= 0.06:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_6_1"
+    elif 0.08 > current_profit >= 0.07:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_7_1"
+    elif 0.09 > current_profit >= 0.08:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_8_1"
+    elif 0.1 > current_profit >= 0.09:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_9_1"
+    elif 0.12 > current_profit >= 0.1:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_10_1"
+    elif 0.2 > current_profit >= 0.12:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_11_1"
+    elif current_profit >= 0.2:
+      if last_sma_200_dec or ((last_stochrsi_k > 90.0) and (last_aroonu_14 > 90.0)):
+        return True, f"exit_{mode_name}_d_12_1"
 
     #  Here ends exit signal conditions for long_exit_dec
 
@@ -39583,6 +39745,49 @@ class NostalgiaForInfinityX8(IStrategy):
     current_time: "datetime",
     buy_tag,
   ) -> tuple:
+    last_stochrsi_k = last_candle["STOCHRSIk_14_14_3_3"]
+    last_willr_480 = last_candle["WILLR_480"]
+    last_aroonu_14_4h = last_candle["AROONU_14_4h"]
+
+    if 0.01 > current_profit >= 0.001:
+      if (last_stochrsi_k < 5.0) and (last_willr_480 < -99.0) and (last_aroonu_14_4h < 5.0):
+        return True, f"exit_{mode_name}_w_0_1"
+    elif 0.02 > current_profit >= 0.01:
+      if (last_stochrsi_k < 5.0) and (last_willr_480 < -99.0) and (last_aroonu_14_4h < 5.0):
+        return True, f"exit_{mode_name}_w_1_1"
+    elif 0.03 > current_profit >= 0.02:
+      if (last_stochrsi_k < 5.0) and (last_willr_480 < -99.0) and (last_aroonu_14_4h < 5.0):
+        return True, f"exit_{mode_name}_w_2_1"
+    elif 0.04 > current_profit >= 0.03:
+      if (last_stochrsi_k < 5.0) and (last_willr_480 < -99.0) and (last_aroonu_14_4h < 5.0):
+        return True, f"exit_{mode_name}_w_3_1"
+    elif 0.05 > current_profit >= 0.04:
+      if (last_stochrsi_k < 5.0) and (last_willr_480 < -99.0) and (last_aroonu_14_4h < 5.0):
+        return True, f"exit_{mode_name}_w_4_1"
+    elif 0.06 > current_profit >= 0.05:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_5_1"
+    elif 0.07 > current_profit >= 0.06:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_6_1"
+    elif 0.08 > current_profit >= 0.07:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_7_1"
+    elif 0.09 > current_profit >= 0.08:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_8_1"
+    elif 0.1 > current_profit >= 0.09:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_9_1"
+    elif 0.12 > current_profit >= 0.1:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_10_1"
+    elif 0.2 > current_profit >= 0.12:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_11_1"
+    elif current_profit >= 0.2:
+      if (last_stochrsi_k < 10.0) and (last_willr_480 < -90.0) and (last_aroonu_14_4h < 10.0):
+        return True, f"exit_{mode_name}_w_12_1"
 
     #  Here ends exit signal conditions for short_exit_williams_r
 
@@ -39602,6 +39807,73 @@ class NostalgiaForInfinityX8(IStrategy):
     current_time: "datetime",
     buy_tag,
   ) -> tuple:
+    last_sma_200_inc = last_candle["SMA_200_inc_24"]
+    last_rsi_14 = last_candle["RSI_14"]
+    last_stochrsi_k = last_candle["STOCHRSIk_14_14_3_3"]
+    last_aroonu_14 = last_candle["AROONU_14"]
+    last_sma_200_inc_1h = last_candle["SMA_200_inc_12_1h"]
+    last_sma_200_inc_4h = last_candle["SMA_200_inc_6_4h"]
+
+    if 0.01 > current_profit >= 0.001:
+      if (
+        last_sma_200_inc
+        and last_sma_200_inc_1h
+        and last_sma_200_inc_4h
+        and (last_rsi_14 < 18.0)
+        and (last_stochrsi_k < 5.0)
+        and (last_aroonu_14 < 5.0)
+      ):
+        return True, f"exit_{mode_name}_d_0_1"
+    elif 0.02 > current_profit >= 0.01:
+      if (
+        last_sma_200_inc
+        and last_sma_200_inc_1h
+        and last_sma_200_inc_4h
+        and (last_rsi_14 < 20.0)
+        and (last_stochrsi_k < 5.0)
+        and (last_aroonu_14 < 5.0)
+      ):
+        return True, f"exit_{mode_name}_d_1_1"
+    elif 0.03 > current_profit >= 0.02:
+      if (
+        last_sma_200_inc
+        and last_sma_200_inc_1h
+        and last_sma_200_inc_4h
+        and (last_rsi_14 < 22.0)
+        and (last_stochrsi_k < 5.0)
+        and (last_aroonu_14 < 5.0)
+      ):
+        return True, f"exit_{mode_name}_d_2_1"
+    elif 0.04 > current_profit >= 0.03:
+      if last_sma_200_inc and (last_rsi_14 < 24.0) and (last_stochrsi_k < 5.0) and (last_aroonu_14 < 10.0):
+        return True, f"exit_{mode_name}_d_3_1"
+    elif 0.05 > current_profit >= 0.04:
+      if last_sma_200_inc and (last_rsi_14 < 26.0) and (last_stochrsi_k < 8.0) and (last_aroonu_14 < 10.0):
+        return True, f"exit_{mode_name}_d_4_1"
+    elif 0.06 > current_profit >= 0.05:
+      if last_sma_200_inc and (last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0):
+        return True, f"exit_{mode_name}_d_5_1"
+    elif 0.07 > current_profit >= 0.06:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_6_1"
+    elif 0.08 > current_profit >= 0.07:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_7_1"
+    elif 0.09 > current_profit >= 0.08:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_8_1"
+    elif 0.1 > current_profit >= 0.09:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_9_1"
+    elif 0.12 > current_profit >= 0.1:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_10_1"
+    elif 0.2 > current_profit >= 0.12:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_11_1"
+    elif current_profit >= 0.2:
+      if last_sma_200_inc or ((last_stochrsi_k < 10.0) and (last_aroonu_14 < 10.0)):
+        return True, f"exit_{mode_name}_d_12_1"
 
     #  Here ends exit signal conditions for short_exit_dec
 
